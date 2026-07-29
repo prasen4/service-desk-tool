@@ -1,0 +1,61 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tech-desk"
+version = "1.0.0"
+description = "Automated Gen AI Technology Desk — research, aggregation, and stakeholder reporting"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "Cotiviti Tech Desk" }]
+keywords = ["genai", "research", "reporting", "tech-desk"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "sqlalchemy>=2.0.36",
+    "alembic>=1.14.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.6.0",
+    "openai>=1.57.0",
+    "anthropic>=0.40.0",
+    "httpx>=0.28.0",
+    "duckduckgo-search>=7.0.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.3.0",
+    "jinja2>=3.1.4",
+    "markdown>=3.7",
+    "python-multipart>=0.0.17",
+    "typer[all]>=0.15.0",
+    "rich>=13.9.0",
+    "apscheduler>=3.10.4",
+    "python-dateutil>=2.9.0",
+    "pyyaml>=6.0.2",
+    "aiofiles>=24.1.0",
+    "weasyprint>=63.0",
+]
+
+[project.optional-dependencies]
+sharepoint = ["msal>=1.31.0", "office365-rest-python-client>=2.5.14"]
+dev = ["pytest>=8.3.0", "pytest-asyncio>=0.24.0", "ruff>=0.8.0"]
+
+[project.scripts]
+tech-desk = "tech_desk.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tech_desk"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

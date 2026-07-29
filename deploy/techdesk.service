@@ -1,0 +1,35 @@
+[Unit]
+Description=Cotiviti Tech Desk Intelligence API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=techdesk
+Group=techdesk
+
+# Application lives here; the .env file is read from this directory.
+WorkingDirectory=/opt/techdesk/app
+EnvironmentFile=/opt/techdesk/app/.env
+
+# IMPORTANT: run a single worker. Background jobs, the in-memory job registry,
+# and the scheduler all live inside one process — multiple workers would
+# duplicate scheduled runs and hide jobs from each other.
+ExecStart=/opt/techdesk/venv/bin/uvicorn tech_desk.api.main:app \
+    --host 127.0.0.1 --port 8080 --workers 1 --proxy-headers \
+    --forwarded-allow-ips '*'
+
+Restart=always
+RestartSec=3
+TimeoutStopSec=20
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+# Allow writes only to the data directory.
+ReadWritePaths=/opt/techdesk/data
+
+[Install]
+WantedBy=multi-user.target

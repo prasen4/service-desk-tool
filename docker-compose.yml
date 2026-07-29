@@ -1,0 +1,22 @@
+services:
+  tech-desk:
+    build: .
+    # Bind to localhost only; put nginx (see deploy/nginx.conf) in front for TLS/auth.
+    ports:
+      - "127.0.0.1:8080:8080"
+    env_file:
+      - .env
+    environment:
+      TECH_DESK_DATA_DIR: /data
+    volumes:
+      - tech-desk-data:/data
+      - ./config:/app/config:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  tech-desk-data:

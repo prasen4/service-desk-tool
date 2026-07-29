@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cotiviti Tech Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,300;0,6..12,400;0,6..12,600;0,6..12,700;0,6..12,800;1,6..12,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/cotiviti-theme.css?v=3">
+  <script>
+    // Apply saved theme before paint to avoid flash. Defaults to light.
+    (function () {
+      var saved = localStorage.getItem('techdesk-theme');
+      if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    })();
+  </script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--color-bg);
+      color: var(--color-text);
+      min-height: 100vh;
+      font-size: var(--text-body);
+      line-height: var(--leading-body);
+      font-weight: var(--weight-body);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    .app { display: flex; min-height: 100vh; }
+
+    /* —— Sidebar —— */
+    .sidebar {
+      width: 264px;
+      background: linear-gradient(180deg, var(--deep-purple) 0%, var(--galaxy-purple) 100%);
+      color: var(--galaxy-purple-4);
+      padding: var(--space-8) var(--space-6);
+      flex-shrink: 0;
+    }
+    .logo { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+    .logo-sub {
+      /* eyebrow — used sparingly */
+      font-size: var(--h6-size); line-height: var(--h6-line);
+      opacity: 0.7; margin-bottom: var(--space-12);
+      letter-spacing: 0.12em; text-transform: uppercase; font-weight: var(--weight-bold);
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: var(--space-3);
+      padding: var(--space-3) var(--space-4); border-radius: var(--radius);
+      cursor: pointer; margin-bottom: var(--space-1);
+      transition: background 0.2s ease; font-size: var(--text-body); font-weight: var(--weight-label);
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.08); }
+    .nav-item.active { background: rgba(124, 97, 186, 0.32); }
+    .nav-icon { width: 22px; text-align: center; font-size: var(--text-small); opacity: 0.9; }
+    .nav-badge {
+      margin-left: auto; background: var(--soothing-violet); color: var(--galaxy-purple-4);
+      font-size: 12px; font-weight: var(--weight-display); border-radius: var(--radius-pill);
+      padding: 0 var(--space-2); min-width: 20px; text-align: center; display: none;
+    }
+    .nav-badge.visible { display: inline-block; }
+    .pulse-dot {
+      width: 9px; height: 9px; border-radius: 50%; background: var(--burnt-orange);
+      flex-shrink: 0; box-shadow: 0 0 0 0 rgba(181, 90, 6, 0.55);
+      animation: pulse 1.6s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(181, 90, 6, 0.55); }
+      70% { box-shadow: 0 0 0 9px rgba(181, 90, 6, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(181, 90, 6, 0); }
+    }
+    .job-row {
+      display: flex; align-items: center; gap: var(--space-4);
+      padding: var(--space-4); border-bottom: 1px solid var(--color-border);
+    }
+    .job-row:last-child { border-bottom: none; }
+    .job-row .job-main { flex: 1; min-width: 0; }
+    .job-row .job-title { font-weight: var(--weight-bold); }
+    .job-row .job-sub { font-size: var(--text-small); color: var(--color-muted); margin-top: var(--space-1); }
+    .job-progress-track { height: 6px; background: var(--color-surface-sunken); border-radius: 3px; overflow: hidden; margin-top: var(--space-2); }
+    .job-progress-fill { height: 100%; background: var(--soothing-violet); border-radius: 3px; transition: width 0.4s ease; }
+    .badge-running { background: var(--color-warning-bg); color: var(--color-warning); }
+    .badge-pending { background: var(--color-link-bg); color: var(--color-primary); }
+
+    /* —— Theme toggle —— */
+    .theme-toggle {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: var(--space-3); margin-top: var(--space-8);
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius); background: rgba(255,255,255,0.06);
+    }
+    .theme-toggle .label {
+      display: flex; align-items: center; gap: var(--space-2);
+      font-size: var(--text-small); font-weight: var(--weight-label); color: var(--galaxy-purple-4);
+    }
+    .switch {
+      position: relative; width: 44px; height: 24px; flex-shrink: 0;
+      border: none; border-radius: var(--radius-pill); cursor: pointer;
+      background: rgba(255,255,255,0.25); transition: background 0.2s ease;
+    }
+    .switch::after {
+      content: ""; position: absolute; top: 3px; left: 3px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--galaxy-purple-4); transition: transform 0.2s ease;
+    }
+    [data-theme="dark"] .switch { background: var(--soothing-violet); }
+    [data-theme="dark"] .switch::after { transform: translateX(20px); }
+    .switch:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(124, 97, 186, 0.5); }
+
+    /* —— Layout —— */
+    .main {
+      flex: 1; padding: var(--space-12);
+      overflow-y: auto; background: var(--color-bg);
+      max-width: 1160px;
+    }
+    .page { display: none; }
+    .page.active { display: block; animation: fadeIn 0.25s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    /* —— Type scale (meaningfully distinct) —— */
+    h1 {
+      font-size: var(--h2-size); line-height: var(--h2-line); font-weight: var(--weight-display);
+      margin-bottom: var(--space-3); color: var(--color-primary); letter-spacing: -0.02em;
+    }
+    .subtitle {
+      color: var(--color-muted); margin-bottom: var(--space-12);
+      font-size: var(--text-body); max-width: 60ch;
+    }
+
+    /* —— Metric cards —— */
+    .cards {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--space-6); margin-bottom: var(--space-12);
+    }
+    .card {
+      background: var(--color-surface); border-radius: var(--radius-lg);
+      padding: var(--space-6); border: 1px solid var(--color-border);
+      box-shadow: var(--shadow);
+    }
+    .card-label {
+      /* eyebrow — sparingly, reserved for metric labels */
+      font-size: var(--h6-size); line-height: var(--h6-line); color: var(--color-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; font-weight: var(--weight-bold);
+    }
+    .card-value {
+      font-size: var(--h3-size); line-height: var(--h3-line); font-weight: var(--weight-display);
+      margin-top: var(--space-2); color: var(--color-primary); letter-spacing: -0.02em;
+    }
+    .card-value.ok { color: var(--color-success); }
+    .card-value.warn { color: var(--color-danger); }
+
+    /* —— Panels —— */
+    .panel {
+      background: var(--color-surface); border-radius: var(--radius-lg);
+      padding: var(--space-8); border: 1px solid var(--color-border);
+      box-shadow: var(--shadow); margin-bottom: var(--space-8);
+    }
+    .panel h2 {
+      font-size: var(--h4-size); line-height: var(--h4-line); font-weight: var(--weight-bold);
+      color: var(--color-text); margin-bottom: var(--space-4); letter-spacing: -0.01em;
+    }
+
+    /* —— Buttons —— */
+    .btn {
+      display: inline-flex; align-items: center; gap: var(--space-2);
+      padding: var(--space-3) var(--space-6); border-radius: var(--radius);
+      font-family: inherit; font-size: var(--text-body); font-weight: var(--weight-bold);
+      cursor: pointer; border: 1px solid transparent;
+      transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .btn-primary {
+      background: var(--color-primary); color: var(--galaxy-purple-4);
+      box-shadow: 0 1px 2px rgba(49, 0, 111, 0.2);
+    }
+    .btn-primary:hover { background: var(--color-primary-hover); }
+    .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-focus-ring); }
+    .btn-accent { background: var(--color-primary); color: var(--galaxy-purple-4); }
+    .btn-accent:hover { background: var(--color-primary-hover); }
+    .btn-outline {
+      background: var(--color-surface); border-color: var(--color-border-strong);
+      color: var(--color-text);
+    }
+    .btn-outline:hover { background: var(--deep-purple-8); border-color: var(--soothing-violet); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-group { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-6); }
+
+    /* —— Forms —— */
+    .form-group { margin-bottom: var(--space-6); }
+    .form-group label {
+      display: block; font-size: var(--text-small); font-weight: var(--weight-label);
+      margin-bottom: var(--space-2); color: var(--color-text);
+    }
+    .form-group input, .form-group select {
+      width: 100%; padding: var(--space-3) var(--space-4);
+      border: 1px solid var(--color-border-strong); border-radius: var(--radius);
+      font-family: inherit; font-size: var(--text-body); background: var(--color-surface);
+      color: var(--color-text); transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .form-group input:focus, .form-group select:focus {
+      outline: none; border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px var(--color-focus-ring);
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
+
+    /* —— Tables —— */
+    table { width: 100%; border-collapse: collapse; font-size: var(--text-body); }
+    th {
+      text-align: left; padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--color-border-strong); color: var(--color-muted);
+      font-weight: var(--weight-label); font-size: var(--text-small);
+    }
+    td { padding: var(--space-4); border-bottom: 1px solid var(--color-border); vertical-align: top; }
+    tr:hover td { background: var(--color-surface-sunken); }
+
+    /* —— Badges (used sparingly) —— */
+    .badge {
+      display: inline-block; padding: var(--space-1) var(--space-3);
+      border-radius: var(--radius-pill); font-size: var(--text-small); font-weight: var(--weight-bold);
+    }
+    .badge-high { background: var(--color-danger-bg); color: var(--color-danger); }
+    .badge-medium { background: var(--color-warning-bg); color: var(--color-warning); }
+    .badge-low { background: var(--color-success-bg); color: var(--color-success); }
+    .badge-priority { background: var(--lively-pink-16); color: var(--summer-rose); }
+    .badge-completed { background: var(--color-success-bg); color: var(--color-success); }
+    .badge-failed { background: var(--color-danger-bg); color: var(--color-danger); }
+
+    /* —— Desk cards —— */
+    .desk-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: var(--space-6);
+    }
+    .desk-card {
+      border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+      padding: var(--space-6); background: var(--color-surface);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .desk-card:hover { border-color: var(--soothing-violet); box-shadow: var(--shadow); }
+    .desk-card h3 {
+      font-size: var(--h5-size); line-height: var(--h5-line); font-weight: var(--weight-bold);
+      margin-bottom: var(--space-2);
+    }
+    .desk-code {
+      font-size: var(--text-small); color: var(--color-primary); font-weight: var(--weight-bold);
+      background: var(--deep-purple-8); padding: var(--space-1) var(--space-3);
+      border-radius: var(--radius); display: inline-block;
+    }
+    .desk-areas {
+      font-size: var(--text-small); color: var(--color-muted);
+      margin-top: var(--space-3); line-height: var(--leading-small);
+    }
+
+    /* —— Status toast —— */
+    .status-bar {
+      position: fixed; bottom: var(--space-6); right: var(--space-6);
+      background: var(--deep-purple); color: var(--galaxy-purple-4);
+      padding: var(--space-4) var(--space-6); border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      display: none; max-width: 400px; z-index: 100;
+    }
+    .status-bar.visible { display: block; }
+    .status-bar .title { font-weight: var(--weight-bold); margin-bottom: var(--space-1); font-size: var(--text-body); }
+    .status-bar .msg { font-size: var(--text-small); opacity: 0.88; }
+    .progress-track {
+      height: 4px; background: rgba(255,255,255,0.2);
+      border-radius: 2px; margin-top: var(--space-3); overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; background: var(--soothing-violet); border-radius: 2px;
+      transition: width 0.4s ease; width: 0%;
+    }
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .link { color: var(--color-link); text-decoration: none; font-weight: var(--weight-label); }
+    .link:hover { text-decoration: underline; }
+    .empty {
+      text-align: center; padding: var(--space-16) var(--space-8); color: var(--color-muted);
+      font-size: var(--text-body);
+    }
+
+    /* —— Vendor news —— */
+    .vendor-layout {
+      display: grid; grid-template-columns: 300px 1fr;
+      gap: var(--space-6); min-height: 480px;
+    }
+    .vendor-list {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); overflow: hidden; max-height: 72vh; overflow-y: auto;
+    }
+    .vendor-list-item {
+      display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+      padding: var(--space-4); border-bottom: 1px solid var(--color-border);
+      cursor: pointer; transition: background 0.15s;
+    }
+    .vendor-list-item:hover, .vendor-list-item.active { background: var(--deep-purple-8); }
+    .vendor-list-item .name { font-weight: var(--weight-bold); font-size: var(--text-body); }
+    .vendor-list-item .meta {
+      font-size: var(--text-small); color: var(--color-muted); margin-top: var(--space-1);
+    }
+    .vendor-count {
+      background: var(--color-primary); color: var(--galaxy-purple-4);
+      font-size: var(--text-small); font-weight: var(--weight-display);
+      padding: var(--space-1) var(--space-3); border-radius: var(--radius-pill);
+      min-width: 28px; text-align: center;
+    }
+    .vendor-detail {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); padding: var(--space-8); max-height: 72vh; overflow-y: auto;
+    }
+    .vendor-detail h2 {
+      font-size: var(--h3-size); line-height: var(--h3-line); font-weight: var(--weight-bold);
+      color: var(--color-primary); margin-bottom: var(--space-2);
+    }
+    .vendor-detail .sub {
+      color: var(--color-muted); font-size: var(--text-small); margin-bottom: var(--space-6);
+    }
+    .news-item {
+      border: 1px solid var(--color-border); border-radius: var(--radius);
+      padding: var(--space-4); margin-bottom: var(--space-3); background: var(--color-surface-sunken);
+    }
+    .news-item h4 {
+      font-size: var(--h5-size); line-height: var(--h5-line); font-weight: var(--weight-bold);
+      margin-bottom: var(--space-2);
+    }
+    .news-item .news-meta {
+      font-size: var(--text-small); color: var(--color-muted); margin-bottom: var(--space-2);
+      display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center;
+    }
+    .badge-desk { background: var(--color-link-bg); color: var(--color-primary); }
+    .badge-untracked { background: var(--galaxy-purple-8); color: var(--color-muted); }
+
+    /* —— LLM setup + cost projection —— */
+    .llm-setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); align-items: start; }
+    .cost-panel { position: relative; }
+    .cost-headline {
+      display: flex; flex-direction: column; gap: var(--space-4);
+      padding: var(--space-6); border-radius: var(--radius-lg);
+      background: var(--deep-purple-8); border: 1px solid var(--color-border);
+      margin-bottom: var(--space-6);
+    }
+    [data-theme="dark"] .cost-headline { background: var(--color-surface-sunken); }
+    .cost-amount {
+      font-size: var(--h1-size); line-height: 1.05; font-weight: var(--weight-display);
+      color: var(--color-primary); letter-spacing: -0.03em; margin-top: var(--space-1);
+    }
+    .cost-note { font-size: var(--text-small); color: var(--color-muted); margin-top: var(--space-2); }
+    .cost-secondary { display: flex; gap: var(--space-8); flex-wrap: wrap; }
+    .cost-sub {
+      font-size: var(--h4-size); line-height: var(--h4-line); font-weight: var(--weight-bold);
+      color: var(--color-text); margin-top: var(--space-1);
+    }
+    .cost-recurring {
+      margin-top: var(--space-6); padding: var(--space-4);
+      border: 1px dashed var(--color-border-strong); border-radius: var(--radius);
+      font-size: var(--text-small); color: var(--color-muted); line-height: 1.5;
+    }
+    .cost-recurring strong { color: var(--color-text); font-weight: var(--weight-bold); }
+    .cost-breakdown { display: flex; flex-direction: column; gap: var(--space-2); }
+    .cost-row {
+      display: flex; justify-content: space-between; gap: var(--space-4);
+      font-size: var(--text-small); padding: var(--space-2) 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .cost-row:last-child { border-bottom: none; }
+    .cost-row .k { color: var(--color-muted); }
+    .cost-row .v { font-weight: var(--weight-label); color: var(--color-text); }
+
+    @media (max-width: 1024px) { .llm-setup-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 900px) {
+      .vendor-layout { grid-template-columns: 1fr; }
+      .main { padding: var(--space-6); }
+      h1 { font-size: var(--h3-size); line-height: var(--h3-line); }
+      .cost-amount { font-size: var(--h2-size); }
+    }
+    @media (max-width: 768px) {
+      .app { flex-direction: column; }
+      .sidebar { width: 100%; padding: var(--space-4) var(--space-6); }
+      .form-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="logo">
+        <svg viewBox="0 0 130 32" height="30" xmlns="http://www.w3.org/2000/svg">
+          <text x="0" y="23" font-family="Nunito Sans, Arial, sans-serif" font-size="18" font-weight="800" fill="#F6F6F7">cotiviti</text>
+        </svg>
+      </div>
+      <div class="logo-sub">Technology Desk Intelligence</div>
+      <nav>
+        <div class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span> Dashboard</div>
+        <div class="nav-item" data-page="activity"><span class="nav-icon">⚡</span> Activity <span class="nav-badge" id="activity-badge">0</span></div>
+        <div class="nav-item" data-page="configure"><span class="nav-icon">🔑</span> LLM Setup</div>
+        <div class="nav-item" data-page="research"><span class="nav-icon">🔍</span> Research</div>
+        <div class="nav-item" data-page="reports"><span class="nav-icon">📋</span> Reports</div>
+        <div class="nav-item" data-page="updates"><span class="nav-icon">📰</span> Updates Feed</div>
+        <div class="nav-item" data-page="vendors"><span class="nav-icon">🏷️</span> Vendor News</div>
+        <div class="nav-item" data-page="desks"><span class="nav-icon">🏢</span> Tech Desks</div>
+      </nav>
+      <div class="theme-toggle">
+        <span class="label"><span id="theme-icon">🌙</span> <span id="theme-label">Dark mode</span></span>
+        <button class="switch" id="theme-switch" role="switch" aria-checked="false" aria-label="Toggle dark mode"></button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- Dashboard -->
+      <div id="page-dashboard" class="page active">
+        <h1>Dashboard</h1>
+        <p class="subtitle">Cotiviti Gen AI technology intelligence — automated briefs for healthcare tech leadership</p>
+        <div class="cards" id="stats-cards"></div>
+        <div class="panel">
+          <h2>One-Click Automation</h2>
+          <p style="color:var(--muted);margin-bottom:var(--space-4);font-size:var(--text-body)">
+            Run the full pipeline: deep web research across all tech desks, LLM-powered curation, and stakeholder-ready report generation.
+          </p>
+          <div class="form-row" style="max-width:600px">
+            <div class="form-group">
+              <label>Tech Desk</label>
+              <select id="pipeline-desk">
+                <option value="">All Desks</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Report Period</label>
+              <select id="pipeline-period">
+                <option value="daily" selected>Daily Brief</option>
+                <option value="weekly">Weekly Intelligence</option>
+                <option value="monthly">Monthly Report</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-accent" id="btn-run-pipeline">▶ Run Full Pipeline</button>
+            <button class="btn btn-outline" id="btn-refresh">↻ Refresh</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Recent Reports</h2>
+          <div id="recent-reports"><div class="empty">No reports yet. Configure your API key and run the pipeline.</div></div>
+        </div>
+      </div>
+
+      <!-- Activity -->
+      <div id="page-activity" class="page">
+        <h1>Activity</h1>
+        <p class="subtitle">Live status of research, report, and pipeline jobs. This view updates automatically.</p>
+        <div class="panel">
+          <div id="activity-list"><div class="empty">Loading jobs...</div></div>
+        </div>
+      </div>
+
+      <!-- Configure -->
+      <div id="page-configure" class="page">
+        <h1>LLM Setup</h1>
+        <p class="subtitle">Choose your model provider and estimate what each brief cadence will cost — one API key is all you need to run everything.</p>
+        <div class="llm-setup-grid">
+          <div class="panel">
+            <h2>Provider &amp; Credentials</h2>
+            <div class="form-group">
+              <label>Provider</label>
+              <select id="provider"></select>
+            </div>
+            <div class="form-group">
+              <label>Model</label>
+              <select id="model-select"></select>
+            </div>
+            <div class="form-group">
+              <label>API Key *</label>
+              <input type="password" id="api-key" placeholder="sk-...">
+            </div>
+            <div class="form-group">
+              <label>Base URL</label>
+              <input type="text" id="base-url" placeholder="https://api.openai.com/v1">
+              <p style="margin-top:var(--space-2);font-size:var(--text-small);color:var(--muted)" id="provider-docs"></p>
+            </div>
+            <button class="btn btn-primary" id="btn-save-config">Save &amp; Validate</button>
+            <p style="margin-top:var(--space-4);font-size:var(--text-small);color:var(--muted)">
+              Supports OpenAI, Anthropic (Claude), Google Gemini, xAI, Mistral, DeepSeek, and any OpenAI-compatible endpoint.
+            </p>
+            <p style="margin-top:var(--space-2);font-size:var(--text-small);color:var(--muted)">
+              On a corporate network? If validation fails due to connectivity, you can
+              <a class="link" href="#" id="btn-save-skip">save without validation</a> and test when running the pipeline.
+            </p>
+          </div>
+
+          <div class="panel cost-panel">
+            <h2>Live Cost Projection</h2>
+            <p style="font-size:var(--text-small);color:var(--muted);margin-bottom:var(--space-6)">
+              Projected LLM spend for the selected model, based on your service desk horizon and number of tech desks.
+            </p>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Service desk horizon</label>
+                <select id="cost-horizon">
+                  <option value="daily">Daily brief</option>
+                  <option value="weekly">Weekly intelligence</option>
+                  <option value="monthly">Monthly report</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Tech desks</label>
+                <input type="number" id="cost-desks" min="1" max="100" value="5">
+              </div>
+            </div>
+
+            <div class="cost-headline">
+              <div class="cost-primary">
+                <div class="card-label">One-time generation</div>
+                <div class="cost-amount" id="cost-run">$0.00</div>
+                <div class="cost-note" id="cost-run-note"></div>
+              </div>
+              <div class="cost-secondary">
+                <div><span class="card-label">Per tech desk</span><div class="cost-sub" id="cost-perdesk">$0.00</div></div>
+                <div><span class="card-label">Total tokens</span><div class="cost-sub" id="cost-tokens">—</div></div>
+              </div>
+            </div>
+
+            <div class="cost-breakdown" id="cost-breakdown"></div>
+
+            <div class="cost-recurring" id="cost-recurring"></div>
+
+            <button class="btn btn-outline" id="btn-estimate" style="margin-top:var(--space-6)">Recalculate estimate</button>
+            <p style="margin-top:var(--space-4);font-size:var(--text-small);color:var(--muted)">
+              Figures use public list prices and modeled token volumes for planning only. Confirm against your provider's current pricing.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Research -->
+      <div id="page-research" class="page">
+        <h1>Research Runs</h1>
+        <p class="subtitle">Web research and AI curation history</p>
+        <div class="btn-group" style="margin-bottom:var(--space-6);align-items:center">
+          <select id="research-desk" style="padding:var(--space-3) var(--space-4);border-radius:var(--radius);border:1px solid var(--color-border-strong);background:var(--color-surface);color:var(--color-text);font-family:inherit;font-size:var(--text-body);min-width:220px">
+            <option value="">All Desks</option>
+          </select>
+          <button class="btn btn-primary" id="btn-run-research">Run Research Now</button>
+        </div>
+        <div class="panel">
+          <table>
+            <thead><tr><th>ID</th><th>Started</th><th>Period</th><th>Status</th><th>Desks</th><th>Updates</th></tr></thead>
+            <tbody id="research-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Reports -->
+      <div id="page-reports" class="page">
+        <h1>Reports</h1>
+        <p class="subtitle">Stakeholder-ready Cotiviti intelligence briefs</p>
+        <div class="btn-group" style="margin-bottom:var(--space-6);align-items:center">
+          <select id="report-desk" style="padding:var(--space-3) var(--space-4);border-radius:var(--radius);border:1px solid var(--color-border-strong);background:var(--color-surface);color:var(--color-text);font-family:inherit;font-size:var(--text-body);min-width:220px">
+            <option value="">All Desks</option>
+          </select>
+          <select id="report-period" style="padding:var(--space-3) var(--space-4);border-radius:var(--radius);border:1px solid var(--color-border-strong);background:var(--color-surface);color:var(--color-text);font-family:inherit;font-size:var(--text-body)">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly" selected>Monthly</option>
+          </select>
+          <button class="btn btn-primary" id="btn-generate-report">Generate Report</button>
+        </div>
+        <div class="panel">
+          <table>
+            <thead><tr><th>Title</th><th>Period</th><th>Generated</th><th>Actions</th></tr></thead>
+            <tbody id="reports-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Updates -->
+      <div id="page-updates" class="page">
+        <h1>Updates Feed</h1>
+        <p class="subtitle">Curated technology updates with source links and dates</p>
+        <div class="form-group" style="max-width:300px;margin-bottom:var(--space-4)">
+          <label>Filter by Desk</label>
+          <select id="desk-filter"><option value="">All Desks</option></select>
+        </div>
+        <div class="panel">
+          <table>
+            <thead><tr><th>Title</th><th>Desk</th><th>Date</th><th>Relevance</th><th>Source</th></tr></thead>
+            <tbody id="updates-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Vendors -->
+      <div id="page-vendors" class="page">
+        <h1>Vendor News</h1>
+        <p class="subtitle">Running feed of curated updates by vendor — click a vendor to see latest news tagged by tech desk</p>
+        <div class="form-group" style="max-width:320px;margin-bottom:var(--space-4)">
+          <label>Filter vendors</label>
+          <input type="text" id="vendor-search" placeholder="Search vendors...">
+        </div>
+        <div class="vendor-layout">
+          <div class="vendor-list" id="vendor-list"><div class="empty">Loading vendors...</div></div>
+          <div class="vendor-detail" id="vendor-detail">
+            <div class="empty">Select a vendor to view their news feed</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desks -->
+      <div id="page-desks" class="page">
+        <h1>Tech Desks</h1>
+        <p class="subtitle">Gen AI monitoring categories aligned with RedCell Technical Prospecting</p>
+        <div class="desk-grid" id="desk-grid"></div>
+      </div>
+    </main>
+  </div>
+
+  <div class="status-bar" id="status-bar">
+    <div class="title"><span class="spinner"></span> <span id="status-title">Running...</span></div>
+    <div class="msg" id="status-msg">Please wait while the pipeline executes.</div>
+    <div class="progress-track"><div class="progress-fill" id="status-progress"></div></div>
+  </div>
+
+  <script>
+    const API = '';
+
+    function showStatus(title, msg, progress = 0) {
+      document.getElementById('status-bar').classList.add('visible');
+      document.getElementById('status-title').textContent = title;
+      document.getElementById('status-msg').textContent = msg;
+      document.getElementById('status-progress').style.width = progress + '%';
+    }
+    function hideStatus() {
+      document.getElementById('status-bar').classList.remove('visible');
+      document.getElementById('status-progress').style.width = '0%';
+    }
+
+    async function pollJob(jobId, onUpdate) {
+      while (true) {
+        const job = await api('/api/jobs/' + jobId);
+        if (onUpdate) onUpdate(job);
+        if (job.status === 'completed') return job;
+        if (job.status === 'failed') throw new Error(job.error || 'Job failed');
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+
+    let activeLocalJob = false;
+
+    async function runJob(endpoint, payload, labels) {
+      activeLocalJob = true;
+      showStatus(labels.start, labels.wait, 2);
+      try {
+        const { job_id } = await api(endpoint, { method: 'POST', body: JSON.stringify({ ...payload, async_mode: true }) });
+        refreshJobActivity();
+        const job = await pollJob(job_id, (j) => {
+          showStatus(labels.running, j.message || labels.wait, j.progress || 10);
+        });
+        hideStatus();
+        return job.result;
+      } catch (e) {
+        hideStatus();
+        throw e;
+      } finally {
+        activeLocalJob = false;
+        refreshJobActivity();
+      }
+    }
+
+    // —— Global job activity monitor (visible on every page, survives refresh) ——
+    function jobTitle(j) {
+      const kind = { pipeline: 'Full pipeline', research: 'Research', report: 'Report generation' }[j.job_type] || j.job_type;
+      return kind;
+    }
+
+    async function refreshJobActivity() {
+      let jobs = [];
+      try { jobs = (await api('/api/jobs?limit=15')).jobs || []; } catch (e) { return; }
+      const active = jobs.filter(j => j.status === 'running' || j.status === 'pending');
+
+      const badge = document.getElementById('activity-badge');
+      if (active.length) { badge.textContent = active.length; badge.classList.add('visible'); }
+      else { badge.classList.remove('visible'); }
+
+      // Drive the bottom-right status bar from server truth (unless a local job is already driving it)
+      if (!activeLocalJob) {
+        if (active.length) {
+          const j = active[0];
+          showStatus(`${jobTitle(j)} running`, j.message || 'Working...', j.progress || 10);
+        } else {
+          hideStatus();
+        }
+      }
+
+      // Keep the Activity page fresh if it's open
+      if (document.getElementById('page-activity').classList.contains('active')) {
+        renderActivity(jobs);
+      }
+    }
+
+    function renderActivity(jobs) {
+      const el = document.getElementById('activity-list');
+      if (!jobs.length) { el.innerHTML = '<div class="empty">No jobs yet. Run research or a pipeline to see activity here.</div>'; return; }
+      el.innerHTML = jobs.map(j => {
+        const badgeClass = j.status === 'completed' ? 'badge-completed'
+          : j.status === 'failed' ? 'badge-failed'
+          : j.status === 'running' ? 'badge-running' : 'badge-pending';
+        const started = j.created_at ? new Date(j.created_at).toLocaleString() : '';
+        const active = j.status === 'running' || j.status === 'pending';
+        const detail = j.status === 'failed' ? `<span style="color:var(--danger)">${(j.error || 'Failed').split('\\n')[0]}</span>`
+          : (j.message || '');
+        const progress = active
+          ? `<div class="job-progress-track"><div class="job-progress-fill" style="width:${j.progress || 5}%"></div></div>` : '';
+        return `<div class="job-row">
+          ${active ? '<span class="pulse-dot"></span>' : '<span style="width:9px"></span>'}
+          <div class="job-main">
+            <div class="job-title">${jobTitle(j)} <span class="badge ${badgeClass}">${j.status}</span></div>
+            <div class="job-sub">${started}${detail ? ' · ' + detail : ''}</div>
+            ${progress}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    async function loadActivity() {
+      try { renderActivity((await api('/api/jobs?limit=25')).jobs || []); }
+      catch (e) { document.getElementById('activity-list').innerHTML = '<div class="empty">Could not load jobs.</div>'; }
+    }
+
+    async function api(path, opts = {}) {
+      const res = await fetch(API + path, {
+        headers: { 'Content-Type': 'application/json', ...opts.headers },
+        ...opts,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        const detail = err.detail;
+        const message = Array.isArray(detail)
+          ? detail.map(d => d.msg || JSON.stringify(d)).join('; ')
+          : (detail || res.statusText || 'Request failed');
+        throw new Error(message);
+      }
+      return res.json();
+    }
+
+    // Theme toggle
+    function applyTheme(theme) {
+      const isDark = theme === 'dark';
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      const sw = document.getElementById('theme-switch');
+      sw.setAttribute('aria-checked', String(isDark));
+      document.getElementById('theme-icon').textContent = isDark ? '☀️' : '🌙';
+      document.getElementById('theme-label').textContent = isDark ? 'Light mode' : 'Dark mode';
+    }
+    applyTheme(localStorage.getItem('techdesk-theme') === 'dark' ? 'dark' : 'light');
+    document.getElementById('theme-switch').addEventListener('click', () => {
+      const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('techdesk-theme', next);
+      applyTheme(next);
+    });
+
+    // Navigation
+    document.querySelectorAll('.nav-item').forEach(el => {
+      el.addEventListener('click', () => {
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('page-' + el.dataset.page).classList.add('active');
+        loadPage(el.dataset.page);
+      });
+    });
+
+    function loadPage(page) {
+      if (page === 'dashboard') loadDashboard();
+      if (page === 'activity') loadActivity();
+      if (page === 'configure') loadLlmSetup();
+      if (page === 'research') loadResearch();
+      if (page === 'reports') loadReports();
+      if (page === 'updates') loadUpdates();
+      if (page === 'vendors') loadVendors();
+      if (page === 'desks') loadDesks();
+    }
+
+    // —— LLM setup + cost projection ——
+    let catalog = null;
+
+    async function loadLlmSetup() {
+      if (!catalog) catalog = await api('/api/models');
+      const providerSel = document.getElementById('provider');
+      providerSel.innerHTML = catalog.providers
+        .map(p => `<option value="${p.id}">${p.label}</option>`).join('');
+
+      const current = catalog.current || {};
+      const activeProvider = current.provider && catalog.providers.some(p => p.id === current.provider)
+        ? current.provider : catalog.providers[0].id;
+      providerSel.value = activeProvider;
+
+      document.getElementById('cost-desks').value = catalog.desk_count || 5;
+      populateModels(activeProvider, current.model);
+      renderProviderMeta(activeProvider);
+      recalcCost();
+    }
+
+    function providerById(id) { return catalog.providers.find(p => p.id === id); }
+    function modelById(id) {
+      for (const p of catalog.providers) { const m = p.models.find(x => x.id === id); if (m) return m; }
+      return null;
+    }
+
+    function populateModels(providerId, preferredModel) {
+      const p = providerById(providerId);
+      const sel = document.getElementById('model-select');
+      if (!p || !p.models.length) {
+        sel.innerHTML = '<option value="">(enter a custom model name)</option>';
+        return;
+      }
+      sel.innerHTML = p.models
+        .map(m => `<option value="${m.id}">${m.label} — $${m.input}/$${m.output} per 1M</option>`).join('');
+      if (preferredModel && p.models.some(m => m.id === preferredModel)) sel.value = preferredModel;
+    }
+
+    function renderProviderMeta(providerId) {
+      const p = providerById(providerId);
+      if (!p) return;
+      const baseInput = document.getElementById('base-url');
+      baseInput.value = (catalog.current && catalog.current.provider === providerId && catalog.current.base_url)
+        ? catalog.current.base_url : p.base_url;
+      document.getElementById('api-key').placeholder = p.key_hint || 'your-api-key';
+      const docs = document.getElementById('provider-docs');
+      docs.innerHTML = p.docs ? `Get a key: <a class="link" href="${p.docs}" target="_blank">${p.docs}</a>` : 'Enter the base URL for your OpenAI-compatible endpoint.';
+    }
+
+    function money(n) {
+      if (n >= 100) return '$' + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+      if (n >= 1) return '$' + n.toFixed(2);
+      return '$' + n.toFixed(n < 0.01 ? 4 : 3);
+    }
+
+    function recalcCost() {
+      if (!catalog) return;
+      const modelId = document.getElementById('model-select').value;
+      const model = modelById(modelId);
+      const horizon = document.getElementById('cost-horizon').value;
+      const deskCount = Math.max(1, parseInt(document.getElementById('cost-desks').value || '1', 10));
+      const measured = (catalog.measured || {})[horizon];
+      const perDesk = measured
+        ? { input: measured.input_per_desk, output: measured.output_per_desk }
+        : catalog.tokens_per_desk_per_run[horizon];
+      const runsPerMonth = catalog.runs_per_month[horizon];
+
+      const inPrice = model ? model.input : 0;
+      const outPrice = model ? model.output : 0;
+      const runIn = perDesk.input * deskCount;
+      const runOut = perDesk.output * deskCount;
+      const runInCost = runIn / 1e6 * inPrice;
+      const runOutCost = runOut / 1e6 * outPrice;
+      const runCost = runInCost + runOutCost;      // one-time generation for N desks
+      const perDeskCost = runCost / deskCount;
+      const monthly = runCost * runsPerMonth;      // if produced on this cadence
+
+      const horizonLabel = { daily: 'daily brief', weekly: 'weekly intelligence report', monthly: 'monthly report' }[horizon];
+
+      // Headline = one-time generation of this report type
+      const sourceNote = measured
+        ? `Calibrated from ${measured.samples} actual run${measured.samples === 1 ? '' : 's'}`
+        : 'Modeled estimate — run a pipeline to calibrate from real usage';
+      document.getElementById('cost-run').textContent = money(runCost);
+      document.getElementById('cost-run-note').textContent =
+        `One ${horizonLabel} across ${deskCount} tech desk${deskCount === 1 ? '' : 's'} · ${sourceNote}`;
+      document.getElementById('cost-perdesk').textContent = money(perDeskCost);
+      document.getElementById('cost-tokens').textContent = (runIn + runOut).toLocaleString();
+
+      const rows = [
+        ['Model', model ? model.label : (modelId || '—')],
+        ['Input price', `$${inPrice.toFixed(2)} / 1M tokens`],
+        ['Output price', `$${outPrice.toFixed(2)} / 1M tokens`],
+        ['Input tokens', `${runIn.toLocaleString()} → ${money(runInCost)}`],
+        ['Output tokens', `${runOut.toLocaleString()} → ${money(runOutCost)}`],
+        ['Tech desks', String(deskCount)],
+      ];
+      document.getElementById('cost-breakdown').innerHTML = rows
+        .map(([k, v]) => `<div class="cost-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+
+      // Secondary: recurring cost if this cadence runs all month
+      const cadenceCount = runsPerMonth % 1 === 0 ? runsPerMonth : runsPerMonth.toFixed(2);
+      document.getElementById('cost-recurring').innerHTML =
+        `If you run this ${horizonLabel} on its normal cadence (~${cadenceCount}×/month), recurring spend is about ` +
+        `<strong>${money(monthly)}/month</strong> (~${money(monthly * 12)}/year).`;
+
+      if (!model) {
+        document.getElementById('cost-breakdown').innerHTML +=
+          '<div class="cost-row"><span class="k">Note</span><span class="v">No list price for this model — set one via the API.</span></div>';
+      }
+    }
+
+    async function loadDashboard() {
+      const health = await api('/api/health');
+      const updates = await api('/api/updates?limit=1');
+      const reports = await api('/api/reports?limit=5');
+      const runs = await api('/api/research/runs?limit=1');
+
+      document.getElementById('stats-cards').innerHTML = `
+        <div class="card"><div class="card-label">System</div><div class="card-value ${health.status === 'ok' ? 'ok' : 'warn'}">${health.status === 'ok' ? 'Ready' : 'Check'}</div></div>
+        <div class="card"><div class="card-label">API Key</div><div class="card-value ${health.api_key_configured ? 'ok' : 'warn'}" style="font-size:var(--h5-size);line-height:var(--h5-line)">${health.api_key_configured ? 'Set' : 'Not Set'}</div></div>
+        <div class="card"><div class="card-label">Model</div><div class="card-value" style="font-size:var(--h5-size);line-height:var(--h5-line)">${health.model}</div></div>
+        <div class="card"><div class="card-label">Last Run</div><div class="card-value" style="font-size:var(--h5-size);line-height:var(--h5-line)">${runs.runs[0] ? runs.runs[0].updates_found + ' updates' : '—'}</div></div>
+      `;
+
+      const container = document.getElementById('recent-reports');
+      if (!reports.reports.length) {
+        container.innerHTML = '<div class="empty">No reports yet.</div>';
+        return;
+      }
+      container.innerHTML = `<table><thead><tr><th>Title</th><th>Period</th><th>Generated</th><th></th></tr></thead><tbody>${
+        reports.reports.map(r => `<tr>
+          <td>${r.title}</td>
+          <td><span class="badge badge-medium">${r.period}</span></td>
+          <td>${new Date(r.generated_at).toLocaleString()}</td>
+          <td><a class="link" href="/api/reports/${r.id}/html" target="_blank">View</a></td>
+        </tr>`).join('')
+      }</tbody></table>`;
+    }
+
+    async function loadResearch() {
+      const data = await api('/api/research/runs?limit=20');
+      document.getElementById('research-table').innerHTML = data.runs.map(r => `<tr>
+        <td>${r.id}</td>
+        <td>${new Date(r.started_at).toLocaleString()}</td>
+        <td>${r.period}</td>
+        <td><span class="badge badge-${r.status === 'completed' ? 'completed' : 'failed'}">${r.status}</span></td>
+        <td>${r.desks_processed}</td>
+        <td>${r.updates_found}</td>
+      </tr>`).join('') || '<tr><td colspan="6" class="empty">No research runs yet</td></tr>';
+    }
+
+    async function loadReports() {
+      const data = await api('/api/reports?limit=50');
+      document.getElementById('reports-table').innerHTML = data.reports.map(r => `<tr>
+        <td>${r.title}</td>
+        <td><span class="badge badge-medium">${r.period}</span></td>
+        <td>${new Date(r.generated_at).toLocaleString()}</td>
+        <td>
+          <a class="link" href="/api/reports/${r.id}/html" target="_blank">View</a>
+          ${r.has_pdf ? ` · <a class="link" href="/api/reports/${r.id}/download/pdf">PDF</a>` : ''}
+          · <a class="link" href="/api/reports/${r.id}/download/markdown">MD</a>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="4" class="empty">No reports yet</td></tr>';
+    }
+
+    let vendorCache = [];
+    let selectedVendor = null;
+
+    function formatDate(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    async function loadVendors() {
+      const data = await api('/api/vendors');
+      vendorCache = data.vendors.filter(v => v.update_count > 0 || v.is_tracked);
+      renderVendorList();
+      if (selectedVendor) loadVendorDetail(selectedVendor);
+    }
+
+    function renderVendorList() {
+      const q = (document.getElementById('vendor-search').value || '').toLowerCase();
+      const filtered = vendorCache.filter(v => v.name.toLowerCase().includes(q));
+      const list = document.getElementById('vendor-list');
+      if (!filtered.length) {
+        list.innerHTML = '<div class="empty">No vendors match. Run research to collect updates.</div>';
+        return;
+      }
+      list.innerHTML = filtered.map(v => `
+        <div class="vendor-list-item ${selectedVendor === v.name ? 'active' : ''}" data-vendor="${encodeURIComponent(v.name)}">
+          <div>
+            <div class="name">${v.name}</div>
+            <div class="meta">${v.latest_at ? 'Latest: ' + formatDate(v.latest_at) : 'No updates yet'}${v.tracked_desks?.length ? ' · ' + v.tracked_desks.map(d => d.name).join(', ') : ''}</div>
+          </div>
+          <span class="vendor-count">${v.update_count}</span>
+        </div>
+      `).join('');
+      list.querySelectorAll('.vendor-list-item').forEach(el => {
+        el.addEventListener('click', () => {
+          selectedVendor = decodeURIComponent(el.dataset.vendor);
+          renderVendorList();
+          loadVendorDetail(selectedVendor);
+        });
+      });
+    }
+
+    async function loadVendorDetail(vendorName) {
+      const detail = document.getElementById('vendor-detail');
+      detail.innerHTML = '<div class="empty">Loading...</div>';
+      try {
+        const data = await api('/api/vendors/' + encodeURIComponent(vendorName) + '/updates?limit=100');
+        const desks = data.tracked_desks?.map(d => `<span class="badge badge-desk">${d.name}</span>`).join(' ') || '';
+        detail.innerHTML = `
+          <h2>${data.vendor}</h2>
+          <div class="sub">${data.update_count} update${data.update_count === 1 ? '' : 's'} · Tracked on: ${desks || '<span class="badge badge-untracked">ad hoc</span>'}</div>
+          ${data.updates.map(u => `
+            <div class="news-item">
+              <h4>${u.title}</h4>
+              <div class="news-meta">
+                <span class="badge badge-desk">${u.desk_name}</span>
+                <span>${formatDate(u.published_date || u.sort_at)}</span>
+                <span class="badge badge-${u.relevance}">${u.relevance}</span>
+              </div>
+              <p style="font-size:var(--text-small);margin-bottom:var(--space-2)">${u.summary}</p>
+              <a class="link" href="${u.source_url}" target="_blank">${u.source_name || 'Source'}</a>
+            </div>
+          `).join('') || '<div class="empty">No updates for this vendor yet.</div>'}
+        `;
+      } catch (e) {
+        detail.innerHTML = `<div class="empty">Could not load updates: ${e.message}</div>`;
+      }
+    }
+
+    async function loadUpdates() {
+      const desk = document.getElementById('desk-filter').value;
+      const data = await api(`/api/updates?limit=100${desk ? '&desk_id=' + desk : ''}`);
+      document.getElementById('updates-table').innerHTML = data.updates.map(u => `<tr>
+        <td><strong>${u.title}</strong><br><small style="color:var(--muted)">${u.vendor ? u.vendor + ' · ' : ''}${u.summary.substring(0,100)}...</small></td>
+        <td><span class="badge badge-desk">${u.desk_code || u.desk_id}</span></td>
+        <td>${u.published_date ? formatDate(u.published_date) : formatDate(u.discovered_at)}</td>
+        <td><span class="badge badge-${u.relevance}">${u.relevance}</span></td>
+        <td><a class="link" href="${u.source_url}" target="_blank">${u.source_name || 'Source'}</a></td>
+      </tr>`).join('') || '<tr><td colspan="5" class="empty">No updates yet. Run research first.</td></tr>';
+    }
+
+    function deskPayload(selectId) {
+      const val = document.getElementById(selectId).value;
+      return val ? { desk_ids: [val] } : {};
+    }
+
+    function populateDeskSelects(desks) {
+      const options = '<option value="">All Desks</option>' +
+        desks.map(d => `<option value="${d.id}">${d.code} — ${d.name}</option>`).join('');
+      ['pipeline-desk', 'research-desk', 'report-desk', 'desk-filter'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = options;
+      });
+    }
+
+    async function loadDesks() {
+      const data = await api('/api/desks');
+      populateDeskSelects(data.desks);
+
+      document.getElementById('desk-grid').innerHTML = data.desks.map(d => `<div class="desk-card">
+        <div class="desk-code">${d.code}</div>
+        <h3>${d.name}</h3>
+        <p style="font-size:var(--text-small);margin-top:var(--space-2)">${d.description}</p>
+        <div class="desk-areas">${d.areas.slice(0,4).join(' · ')}${d.areas.length > 4 ? ' ...' : ''}</div>
+        ${d.key_vendors ? `<div class="desk-areas" style="margin-top:var(--space-2)"><strong>Tracked vendors:</strong> ${d.key_vendors.slice(0,6).join(', ')}, and more</div>` : ''}
+        <div class="btn-group" style="margin-top:var(--space-4)">
+          <button class="btn btn-outline btn-run-desk" data-desk="${d.id}" data-name="${d.name}">Run Monthly Report</button>
+        </div>
+      </div>`).join('');
+
+      document.querySelectorAll('.btn-run-desk').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const deskId = btn.dataset.desk;
+          const deskName = btn.dataset.name;
+          if (!confirm(`Run full monthly pipeline for ${deskName}?`)) return;
+          try {
+            const result = await runJob('/api/pipeline/run',
+              { period: 'monthly', desk_ids: [deskId] },
+              { start: 'Running Pipeline', running: `Processing ${deskName}`, wait: 'Researching and generating report...' }
+            );
+            alert(`Done! ${result.report.title}\nUpdates: ${result.report.total_updates}`);
+            loadDashboard();
+          } catch (e) { hideStatus(); alert('Error: ' + e.message); }
+        });
+      });
+    }
+
+    // Actions
+    async function saveConfig(skipValidation = false) {
+      try {
+        showStatus(skipValidation ? 'Saving...' : 'Validating...', skipValidation
+          ? 'Saving API key without connectivity check'
+          : 'Checking API key connectivity');
+        const result = await api('/api/configure', {
+          method: 'POST',
+          body: JSON.stringify({
+            api_key: document.getElementById('api-key').value.trim(),
+            provider: document.getElementById('provider').value,
+            base_url: document.getElementById('base-url').value.trim(),
+            model: document.getElementById('model-select').value.trim(),
+            skip_validation: skipValidation,
+          }),
+        });
+        hideStatus();
+        if (catalog && catalog.current) { catalog.current.provider = result.provider; catalog.current.model = result.model; }
+        alert(`Configured successfully!\nProvider: ${result.provider}\nModel: ${result.model}`);
+      } catch (e) { hideStatus(); alert('Error: ' + e.message); }
+    }
+
+    document.getElementById('provider').addEventListener('change', (e) => {
+      populateModels(e.target.value);
+      renderProviderMeta(e.target.value);
+      recalcCost();
+    });
+    document.getElementById('model-select').addEventListener('change', recalcCost);
+    document.getElementById('cost-horizon').addEventListener('change', recalcCost);
+    document.getElementById('cost-desks').addEventListener('input', recalcCost);
+    document.getElementById('btn-estimate').addEventListener('click', recalcCost);
+
+    document.getElementById('btn-save-config').addEventListener('click', () => saveConfig(false));
+    document.getElementById('btn-save-skip').addEventListener('click', (e) => {
+      e.preventDefault();
+      if (confirm('Save API key without validating connectivity? Use this only if your network blocks the validation check.')) {
+        saveConfig(true);
+      }
+    });
+
+    document.getElementById('btn-run-pipeline').addEventListener('click', async () => {
+      const period = document.getElementById('pipeline-period').value;
+      const payload = { period, ...deskPayload('pipeline-desk') };
+      try {
+        const result = await runJob('/api/pipeline/run', payload, {
+          start: 'Starting Pipeline',
+          running: 'Pipeline Running',
+          wait: 'Researching web, curating with AI, generating brief...',
+        });
+        const r = result.report;
+        const link = r.report_id ? `\n\nView: /api/reports/${r.report_id}/html` : '';
+        alert(`Pipeline complete!\n\nUpdates: ${result.research.updates_found}\nReport: ${r.title}${link}`);
+        loadDashboard();
+      } catch (e) { hideStatus(); alert('Error: ' + e.message); }
+    });
+
+    document.getElementById('btn-run-research').addEventListener('click', async () => {
+      try {
+        const result = await runJob('/api/research/run',
+          { period: 'daily', ...deskPayload('research-desk') },
+          { start: 'Researching', running: 'Research in progress', wait: 'Scanning web for tech desk updates...' }
+        );
+        alert(`Research complete: ${result.updates_found} new updates`);
+        loadResearch();
+      } catch (e) { hideStatus(); alert('Error: ' + e.message); }
+    });
+
+    document.getElementById('btn-generate-report').addEventListener('click', async () => {
+      const period = document.getElementById('report-period').value;
+      try {
+        const result = await runJob('/api/reports/generate',
+          { period, ...deskPayload('report-desk') },
+          { start: 'Generating Report', running: 'Synthesizing intelligence', wait: 'Building stakeholder brief...' }
+        );
+        alert('Report generated: ' + result.title);
+        loadReports();
+      } catch (e) { hideStatus(); alert('Error: ' + e.message); }
+    });
+
+    document.getElementById('btn-refresh').addEventListener('click', () => loadDashboard());
+    document.getElementById('desk-filter').addEventListener('change', () => loadUpdates());
+    document.getElementById('vendor-search').addEventListener('input', () => renderVendorList());
+
+    // Initial load
+    loadDashboard();
+    loadDesks();
+
+    // Global job monitor — reflects in-progress jobs on any page, even after refresh
+    refreshJobActivity();
+    setInterval(refreshJobActivity, 4000);
+  </script>
+</body>
+</html>

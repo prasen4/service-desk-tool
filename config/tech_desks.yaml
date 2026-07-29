@@ -1,0 +1,222 @@
+# Technology Desk definitions — aligned with RedCell Technical Prospecting framework
+organization: Cotiviti / RedCell
+version: "1.1"
+
+desks:
+  - id: infrastructure
+    code: I
+    name: Gen AI Infrastructure
+    priority: false
+    description: Cost, efficiency, and trends in cloud, compute, storage, and network for Gen AI workloads.
+    key_vendors:
+      - NVIDIA
+      - AWS
+      - Microsoft Azure
+      - Google Cloud
+      - CoreWeave
+      - Lambda Labs
+    areas:
+      - cloud infrastructure
+      - GPU compute pricing
+      - AI data center
+      - storage for LLM training
+      - network bandwidth AI
+      - inference cost optimization
+      - hyperscaler AI infrastructure
+    search_queries:
+      - "generative AI cloud infrastructure cost trends"
+      - "GPU compute pricing AI training inference"
+      - "AI data center storage network 2025"
+      - "hyperscaler AI infrastructure announcements"
+
+  - id: models
+    code: M
+    name: Gen AI Models
+    priority: true
+    description: Foundation models, domain-specific models, model hubs, and hyperscaler model offerings.
+    key_vendors:
+      - OpenAI
+      - Anthropic
+      - Google DeepMind
+      - Meta AI
+      - Mistral AI
+      - Cohere
+      - Hugging Face
+      - xAI
+    areas:
+      - foundation models
+      - domain-specific LLMs
+      - model hubs
+      - hyperscaler models
+      - open source LLMs
+      - multimodal models
+      - model benchmarks
+    search_queries:
+      - "foundation model release announcement"
+      - "domain specific LLM healthcare finance"
+      - "Hugging Face model hub new models"
+      - "open source LLM benchmark 2025"
+
+  - id: engineering_tools
+    code: ET
+    name: Gen AI Engineering Tools
+    priority: true
+    description: Datacentric and modelcentric tooling for building and operating Gen AI systems.
+    key_vendors:
+      - LangChain
+      - LlamaIndex
+      - Databricks
+      - Pinecone
+      - Weaviate
+      - Weights & Biases
+      - AWS Bedrock
+      - Microsoft Azure AI
+      - Google Vertex AI
+      - Arize AI
+    sub_areas:
+      datacentric:
+        - prompt engineering
+        - data mesh
+        - fine-tuning
+        - vector databases
+        - AI agents
+      modelcentric:
+        - model deployment
+        - alignment
+        - API orchestration
+        - AI trust risk security
+    areas:
+      - prompt engineering tools
+      - RAG vector database
+      - LLM fine-tuning platforms
+      - AI agent frameworks
+      - model deployment MLOps
+      - LLM alignment safety
+      - AI API orchestration
+      - AI TRiSM governance
+    search_queries:
+      - "prompt engineering platform update"
+      - "vector database RAG enterprise"
+      - "LLM fine-tuning tool release"
+      - "AI agent framework enterprise"
+      - "model deployment LLM production"
+      - "AI governance TRiSM security"
+
+  - id: applications
+    code: APPS
+    name: Gen AI Applications
+    priority: true
+    description: Horizontal and vertical Gen AI application deployments across industries.
+    key_vendors:
+      - Microsoft Copilot
+      - Salesforce
+      - ServiceNow
+      - Google Workspace AI
+      - Harvey
+      - Thomson Reuters
+      - Workday
+      - Palantir
+      - UiPath
+    sub_areas:
+      horizontal:
+        - productivity
+        - IT operations
+        - knowledge management
+        - media
+        - sales and marketing
+      vertical:
+        - BFSI banking financial services insurance
+        - legal and compliance
+    areas:
+      - Gen AI productivity tools
+      - enterprise knowledge management AI
+      - AI sales marketing automation
+      - Gen AI banking insurance
+      - legal AI compliance
+      - healthcare payer provider AI apps
+    search_queries:
+      - "enterprise Gen AI productivity application"
+      - "AI knowledge management enterprise"
+      - "generative AI banking insurance use case"
+      - "legal AI compliance automation"
+      - "healthcare payer AI application"
+
+  - id: hcls
+    code: HCLS
+    name: HealthTech / Life Sciences Solutions & Use Cases
+    priority: false
+    description: Standards, interoperability, digital health, pharma, and regulatory landscape.
+    key_vendors:
+      - Epic
+      - Oracle Health
+      - InterSystems
+      - Veeva
+      - Tempus
+      - Flatiron Health
+      - Microsoft Nuance
+      - Amazon HealthLake
+      - FDA
+      - CMS
+    areas:
+      - healthcare interoperability standards
+      - health information exchange HIE
+      - EHR electronic health records AI
+      - hospital health plan digital health
+      - pharma life sciences AI
+      - healthcare AI regulations FDA
+      - market intelligence healthcare AI
+    search_queries:
+      - "healthcare AI interoperability FHIR"
+      - "EHR generative AI clinical"
+      - "digital health AI payer provider"
+      - "pharma life sciences generative AI"
+      - "FDA AI healthcare regulation"
+      - "healthcare AI market intelligence"
+
+reporting:
+  daily:
+    max_items_per_desk: 5
+    max_items_per_vendor: 3
+    max_highlights: 3
+    max_llm_tokens: 800
+    include_executive_summary: false
+    include_recommendations: false
+    only_active_vendors: true
+    vendor_centric: true
+  weekly:
+    max_items_per_desk: 15
+    max_items_per_vendor: 5
+    max_highlights: 4
+    max_llm_tokens: 1500
+    include_executive_summary: true
+    include_recommendations: true
+    only_active_vendors: false
+    vendor_centric: true
+  monthly:
+    max_items_per_desk: 50
+    max_items_per_vendor: 8
+    include_executive_summary: true
+    include_trend_analysis: true
+    include_vendor_landscape: true
+    include_recommendations: true
+    vendor_centric: true
+
+branding:
+  organization: Cotiviti
+  product_name: Technology Desk Intelligence
+  tagline: Gen AI intelligence for healthcare technology leadership
+  font: "Nunito Sans"
+  colors:
+    deep_purple: "#31006F"
+    soothing_violet: "#7C61BA"
+    lively_pink: "#D80F88"
+    galaxy_purple: "#241E32"
+    purple: "#31006F"
+    purple_dark: "#390A75"
+    purple_light: "#E6E0EE"
+    background: "#F7F5F9"
+    link: "#7C61BA"
+    link_bg: "#EAE6F4"
+    success: "#1B5E20"
+    warning: "#B55A06"
+    danger: "#47052D"

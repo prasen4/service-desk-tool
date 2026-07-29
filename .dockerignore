@@ -1,0 +1,39 @@
+# Secrets & local config
+.env
+*.env
+!.env.example
+
+# Application data & outputs
+data/
+outputs/
+*.db
+*.sqlite3
+*.log
+
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.pytest-data/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# VCS & IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Docs & tests not needed in the image
+tests/
+deploy/
+DEPLOYMENT.md

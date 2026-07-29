@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ report.title }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,400;0,6..12,600;0,6..12,700;0,6..12,800;1,6..12,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --deep-purple: #31006F;
+      --soothing-violet: #7C61BA;
+      --lively-pink: #D80F88;
+      --galaxy-purple: #241E32;
+      --burnt-orange: #B55A06;
+      --summer-rose: #990B60;
+      --evening-garnet: #47052D;
+      --purple: #31006F;
+      --purple-hover: #390A75;
+      --purple-light: #E6E0EE;
+      --bg: #F5F2F9;
+      --card: #FDFCFE;
+      --sunken: #F7F5F9;
+      --text: #241E32;
+      --muted: #7C7884;
+      --border: #E5E4E6;
+      --border-strong: #D3D2D6;
+      --link: #7C61BA;
+      --link-bg: #EAE6F4;
+      --success: #1B5E20;
+      --success-bg: #E8F5E9;
+      --warning: #B55A06;
+      --warning-bg: #F3E5D7;
+      --danger: #47052D;
+      --danger-bg: #F8F5F7;
+      --radius: 8px;
+      --radius-lg: 12px;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-6: 24px;
+      --space-8: 32px;
+      --shadow: 0 1px 2px rgba(36, 30, 50, 0.04), 0 4px 14px rgba(36, 30, 50, 0.05);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Nunito Sans", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      padding: var(--space-8);
+      font-size: 17px;
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    .header {
+      background: linear-gradient(135deg, var(--deep-purple) 0%, #241E32 100%);
+      color: #F6F6F7;
+      padding: var(--space-8);
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-6);
+      box-shadow: var(--shadow);
+    }
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-6);
+      padding-bottom: var(--space-4);
+      border-bottom: 1px solid rgba(255,255,255,0.16);
+    }
+    .brand-logo { height: 28px; }
+    .brand-text {
+      /* eyebrow — used sparingly */
+      font-size: 15px; opacity: 0.78;
+      letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+    }
+    .header h1 {
+      font-size: 40px; font-weight: 800; margin-bottom: var(--space-3);
+      line-height: 1.1; letter-spacing: -0.02em;
+    }
+    .header .meta { opacity: 0.88; font-size: 17px; }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .badge-period { background: rgba(124, 97, 186, 0.45); color: #F6F6F7; margin-left: var(--space-2); }
+    .badge-priority { background: #D80F88; color: #F6F6F7; margin-left: var(--space-2); }
+    .exec-summary {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--purple);
+      padding: var(--space-6);
+      border-radius: var(--radius);
+      margin-bottom: var(--space-6);
+      box-shadow: var(--shadow);
+    }
+    .exec-summary h2 {
+      font-size: 15px; line-height: 1.4; color: var(--muted); margin-bottom: var(--space-3);
+      text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;
+    }
+    .exec-summary p { font-size: 17px; line-height: 1.55; }
+    .desk-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      margin-bottom: var(--space-4);
+      page-break-inside: avoid;
+      box-shadow: var(--shadow);
+    }
+    .desk-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+      padding-bottom: var(--space-4);
+      border-bottom: 1px solid var(--border);
+    }
+    .desk-header h2 { font-size: 22px; font-weight: 700; color: var(--purple); line-height: 1.2; }
+    .desk-code {
+      background: var(--purple-light);
+      color: var(--purple);
+      padding: 4px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .highlights { margin: var(--space-4) 0; }
+    .highlights h3 {
+      font-size: 15px; line-height: 1.4; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: var(--space-2); font-weight: 700;
+    }
+    .highlights li { margin-left: 20px; margin-bottom: var(--space-2); font-size: 17px; }
+    .update-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: var(--space-4);
+      margin-bottom: var(--space-3);
+      display: flex;
+      gap: var(--space-4);
+      background: var(--bg);
+    }
+    .update-thumb {
+      width: 72px;
+      height: 54px;
+      object-fit: cover;
+      border-radius: 8px;
+      flex-shrink: 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+    }
+    .update-body { flex: 1; min-width: 0; }
+    .update-card h4 { font-size: 18px; font-weight: 700; margin-bottom: var(--space-2); line-height: 1.3; }
+    .update-meta { font-size: 14px; color: var(--muted); margin-bottom: var(--space-2); }
+    .relevance-high { color: var(--danger); font-weight: 700; }
+    .relevance-medium { color: var(--warning); font-weight: 700; }
+    .relevance-low { color: var(--success); font-weight: 700; }
+    .update-card a {
+      display: inline-block;
+      color: var(--link);
+      background: var(--link-bg);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      word-break: break-all;
+      margin-top: var(--space-2);
+    }
+    .takeaways { margin-top: var(--space-2); padding-left: 20px; font-size: 17px; }
+    .subsection { margin-top: var(--space-4); }
+    .subsection h3 {
+      font-size: 15px; line-height: 1.4; color: var(--muted); margin-bottom: var(--space-3);
+      text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;
+    }
+    .recommendations li { margin-left: 20px; margin-bottom: var(--space-2); }
+    .vendor-card {
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--purple);
+      border-radius: var(--radius);
+      padding: var(--space-4) var(--space-6);
+      margin-bottom: var(--space-4);
+      background: var(--card);
+    }
+    .vendor-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-2);
+    }
+    .vendor-logo {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
+      border-radius: 8px;
+      background: #FAF9FC;
+      border: 1px solid var(--border);
+      padding: 4px;
+    }
+    .vendor-card h4 { font-size: 18px; font-weight: 700; color: var(--text); }
+    .activity-high { background: var(--danger-bg); color: var(--danger); }
+    .activity-moderate { background: var(--warning-bg); color: var(--warning); }
+    .activity-low { background: var(--link-bg); color: var(--link); }
+    .activity-none { background: #EDEDEF; color: var(--muted); }
+    .vendor-trend { font-size: 17px; margin-bottom: var(--space-2); }
+    .compact .vendor-card { padding: var(--space-3) var(--space-4); }
+    .compact .update-card { padding: var(--space-3); }
+    .footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: var(--space-8);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--border);
+    }
+    .footer strong { color: var(--purple); }
+    @media print {
+      body { padding: 0; background: #FAF9FC; }
+      .desk-section { border: 1px solid var(--border); box-shadow: none; }
+    }
+  </style>
+</head>
+<body class="{% if report.period == 'daily' %}compact{% endif %}">
+  <div class="container">
+    <div class="header">
+      <div class="brand-row">
+        <svg class="brand-logo" viewBox="0 0 200 32" xmlns="http://www.w3.org/2000/svg">
+          <text x="0" y="23" font-family="Nunito Sans, Arial, sans-serif" font-size="18" font-weight="800" fill="#F6F6F7">cotiviti</text>
+        </svg>
+        <span class="brand-text">Technology Desk Intelligence</span>
+      </div>
+      <h1>{{ report.title }}</h1>
+      <div class="meta">
+        {{ report.period_start.strftime('%b %d, %Y') }} — {{ report.period_end.strftime('%b %d, %Y') }}
+        <span class="badge badge-period">{{ report.period|title }}</span>
+      </div>
+    </div>
+
+    {% if report.executive_summary %}
+    <div class="exec-summary">
+      <h2>Executive Summary</h2>
+      <p>{{ report.executive_summary }}</p>
+    </div>
+    {% endif %}
+
+    {% for section in report.sections %}
+    <div class="desk-section">
+      <div class="desk-header">
+        <span class="desk-code">{{ section.desk_code }}</span>
+        <h2>{{ section.desk_name }}</h2>
+        {% if section.priority %}<span class="badge badge-priority">Priority</span>{% endif %}
+      </div>
+
+      {% if section.executive_summary %}
+      <p>{{ section.executive_summary }}</p>
+      {% endif %}
+
+      {% if section.highlights %}
+      <div class="highlights">
+        <h3>Key Highlights</h3>
+        <ul>
+          {% for h in section.highlights %}<li>{{ h }}</li>{% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% if section.vendor_sections %}
+      <div class="subsection">
+        <h3>Vendor Intelligence</h3>
+        {% for vs in section.vendor_sections %}
+        {% if vs.activity_level != 'none' or vs.updates %}
+        <div class="vendor-card">
+          <div class="vendor-header">
+            {% if vs.image_url %}
+            <img class="vendor-logo" src="{{ vs.image_url }}" alt="{{ vs.vendor }}" onerror="this.style.display='none'">
+            {% endif %}
+            <h4>{{ vs.vendor }} <span class="badge activity-{{ vs.activity_level }}">{{ vs.activity_level|upper }}</span></h4>
+          </div>
+          {% if vs.trend_summary %}
+          <p class="vendor-trend">{{ vs.trend_summary }}</p>
+          {% endif %}
+          {% if vs.strategic_position and report.period != 'daily' %}
+          <p><strong>Position:</strong> {{ vs.strategic_position }}</p>
+          {% endif %}
+          {% if vs.latest_moves %}
+          <ul class="takeaways">
+            {% for m in vs.latest_moves %}<li>{{ m }}</li>{% endfor %}
+          </ul>
+          {% endif %}
+          {% if vs.updates %}
+          {% for u in vs.updates %}
+          <div class="update-card">
+            {% if u.image_url %}
+            <img class="update-thumb" src="{{ u.image_url }}" alt="" onerror="this.style.display='none'">
+            {% endif %}
+            <div class="update-body">
+              <h4>{{ u.title }}</h4>
+              <div class="update-meta">
+                {{ (u.published_date or u.discovered_at).strftime('%Y-%m-%d') }} &nbsp;|&nbsp;
+                <span class="relevance-{{ u.relevance.value }}">{{ u.relevance.value|upper }}</span>
+              </div>
+              <p>{{ u.summary }}</p>
+              <a href="{{ u.source_url }}" target="_blank">{{ u.source_name or 'Source' }}</a>
+            </div>
+          </div>
+          {% endfor %}
+          {% endif %}
+          {% if vs.watch_items and report.period != 'daily' %}
+          <p><strong>Watch:</strong> {{ vs.watch_items|join('; ') }}</p>
+          {% endif %}
+          {% if vs.cotiviti_relevance and report.period != 'daily' %}
+          <p><strong>Cotiviti:</strong> {{ vs.cotiviti_relevance }}</p>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% elif section.updates %}
+      <div class="subsection">
+        <h3>Updates ({{ section.updates|length }})</h3>
+        {% for u in section.updates %}
+        <div class="update-card">
+          {% if u.image_url %}
+          <img class="update-thumb" src="{{ u.image_url }}" alt="" onerror="this.style.display='none'">
+          {% endif %}
+          <div class="update-body">
+            <h4>{{ u.title }}</h4>
+            <div class="update-meta">
+              {{ (u.published_date or u.discovered_at).strftime('%Y-%m-%d') }} &nbsp;|&nbsp;
+              <span class="relevance-{{ u.relevance.value }}">{{ u.relevance.value|upper }}</span>
+            </div>
+            <p>{{ u.summary }}</p>
+            <a href="{{ u.source_url }}" target="_blank">{{ u.source_name or 'Source' }}</a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if section.trend_analysis %}
+      <div class="subsection">
+        <h3>Trend Analysis</h3>
+        <p>{{ section.trend_analysis }}</p>
+      </div>
+      {% endif %}
+
+      {% if section.vendor_landscape %}
+      <div class="subsection">
+        <h3>Vendor Landscape</h3>
+        <p>{{ section.vendor_landscape }}</p>
+      </div>
+      {% endif %}
+
+      {% if section.recommendations %}
+      <div class="subsection recommendations">
+        <h3>Recommendations</h3>
+        <ul>
+          {% for r in section.recommendations %}<li>{{ r }}</li>{% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="footer">
+      <strong>Cotiviti</strong> — Technology Desk Intelligence &nbsp;|&nbsp; Confidential
+    </div>
+  </div>
+</body>
+</html>
