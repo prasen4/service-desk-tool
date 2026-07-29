@@ -8,6 +8,9 @@ services:
       - .env
     environment:
       TECH_DESK_DATA_DIR: /data
+      # When the postgres profile is enabled, point the app at the db service.
+      # Leave DATABASE_URL empty in .env to keep the SQLite fallback.
+      DATABASE_URL: ${DATABASE_URL:-}
     volumes:
       - tech-desk-data:/data
       - ./config:/app/config:ro
@@ -18,5 +21,28 @@ services:
       timeout: 10s
       retries: 3
 
+  # Optional PostgreSQL for concurrent writers. Start with:
+  #   docker compose --profile postgres up -d --build
+  # and set in .env:
+  #   DATABASE_URL=postgresql+psycopg://techdesk:techdesk@db:5432/techdesk
+  db:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: techdesk
+      POSTGRES_PASSWORD: techdesk
+      POSTGRES_DB: techdesk
+    volumes:
+      - tech-desk-pg:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U techdesk -d techdesk"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
 volumes:
   tech-desk-data:
+  tech-desk-pg:

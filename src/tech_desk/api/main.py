@@ -109,7 +109,12 @@ async def lifespan(app: FastAPI):
         _scheduler = TechDeskScheduler()
         _scheduler.start()
         logger.info("Automated scheduler enabled")
-    logger.info("Tech Desk API v%s started (env=%s)", __version__, settings.env)
+    logger.info(
+        "Tech Desk API v%s started (env=%s, database=%s)",
+        __version__,
+        settings.env,
+        settings.db_backend,
+    )
     yield
     if _scheduler:
         _scheduler.stop()
@@ -180,6 +185,7 @@ async def health():
         "api_key_configured": bool(settings.openai_api_key),
         "provider": settings.llm_provider,
         "model": settings.openai_model,
+        "database": settings.db_backend,
         "scheduler_enabled": settings.scheduler_enabled,
     }
 
@@ -187,15 +193,19 @@ async def health():
 @app.get("/api/ready")
 async def ready():
     checks: dict[str, Any] = {}
+    settings = get_settings()
     try:
         t0 = time.perf_counter()
         with get_engine().connect() as conn:
             conn.execute(text("SELECT 1"))
-        checks["database"] = {"ok": True, "latency_ms": round((time.perf_counter() - t0) * 1000)}
+        checks["database"] = {
+            "ok": True,
+            "backend": settings.db_backend,
+            "latency_ms": round((time.perf_counter() - t0) * 1000),
+        }
     except Exception as exc:
-        checks["database"] = {"ok": False, "error": str(exc)}
+        checks["database"] = {"ok": False, "backend": settings.db_backend, "error": str(exc)}
 
-    settings = get_settings()
     data_dir = settings.tech_desk_data_dir
     checks["disk_writable"] = {"ok": data_dir.exists() and data_dir.is_dir()}
     checks["api_key_configured"] = {"ok": bool(settings.openai_api_key)}

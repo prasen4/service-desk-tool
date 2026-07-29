@@ -147,6 +147,30 @@ Edit `config/tech_desks.yaml` to customize:
 Runtime configuration is environment-driven via `.env` (see `.env.example` for
 every option and `DEPLOYMENT.md` for a production reference table).
 
+## Database
+
+By default the app uses an embedded **SQLite** file in `TECH_DESK_DATA_DIR` —
+zero setup, ideal for a single instance. To support **many concurrent
+writers/users**, point it at **PostgreSQL** instead; SQLite remains the
+automatic local fallback whenever `DATABASE_URL` is unset.
+
+```bash
+pip install -e ".[postgres]"
+# in .env:
+DATABASE_URL=postgresql+psycopg://techdesk:password@localhost:5432/techdesk
+```
+
+Or with Docker Compose:
+
+```bash
+# in .env set DATABASE_URL=postgresql+psycopg://techdesk:techdesk@db:5432/techdesk
+docker compose --profile postgres up -d --build
+```
+
+Tables are created automatically on first startup for either backend. See
+[DEPLOYMENT.md](DEPLOYMENT.md#database--scaling) for Postgres provisioning and
+what else is required to run more than one app instance.
+
 ## Development
 
 ```bash

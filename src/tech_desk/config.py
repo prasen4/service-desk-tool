@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     tech_desk_data_dir: Path = Field(default=Path("./data"), validation_alias="TECH_DESK_DATA_DIR")
     tech_desk_host: str = Field(default="0.0.0.0", validation_alias="TECH_DESK_HOST")
     tech_desk_port: int = Field(default=8080, validation_alias="TECH_DESK_PORT")
+
+    # Database. Leave DATABASE_URL empty to use the local SQLite file in the data
+    # dir; set it to a PostgreSQL URL to support many concurrent writers/users.
+    database_url_override: str = Field(default="", validation_alias="DATABASE_URL")
+    db_pool_size: int = Field(default=5, validation_alias="DB_POOL_SIZE")
+    db_max_overflow: int = Field(default=10, validation_alias="DB_MAX_OVERFLOW")
     tech_desk_secret_key: str = Field(default="dev-secret-change-me", validation_alias="TECH_DESK_SECRET_KEY")
     env: str = Field(default="development", validation_alias="ENV")
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
@@ -67,8 +73,18 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
+        if self.database_url_override.strip():
+            return self.database_url_override.strip()
         db_path = self.tech_desk_data_dir / "tech_desk.db"
         return f"sqlite:///{db_path.resolve()}"
+
+    @property
+    def is_sqlite(self) -> bool:
+        return self.database_url.startswith("sqlite")
+
+    @property
+    def db_backend(self) -> str:
+        return "sqlite" if self.is_sqlite else self.database_url.split(":", 1)[0].split("+", 1)[0]
 
 
 @lru_cache

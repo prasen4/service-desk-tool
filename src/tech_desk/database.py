@@ -92,26 +92,44 @@ _engine = None
 _SessionLocal = None
 
 
+def reset_engine() -> None:
+    """Drop the cached engine/session factory (used by tests and config reloads)."""
+    global _engine, _SessionLocal
+    if _engine is not None:
+        _engine.dispose()
+    _engine = None
+    _SessionLocal = None
+
+
 def get_engine():
     global _engine
     if _engine is None:
         settings = get_settings()
         url = settings.database_url
-        connect_args: dict = {}
-        if url.startswith("sqlite"):
+        if settings.is_sqlite:
             # Background jobs and the request threadpool share the engine, so
             # connections must be usable across threads. busy_timeout lets a
             # writer wait for a lock instead of failing with "database is locked".
-            connect_args = {"check_same_thread": False, "timeout": 30}
-        _engine = create_engine(
-            url,
-            echo=False,
-            future=True,
-            pool_pre_ping=True,
-            connect_args=connect_args,
-        )
-        if url.startswith("sqlite"):
+            _engine = create_engine(
+                url,
+                echo=False,
+                future=True,
+                pool_pre_ping=True,
+                connect_args={"check_same_thread": False, "timeout": 30},
+            )
             _configure_sqlite(_engine)
+        else:
+            # Server databases (e.g. PostgreSQL) handle many concurrent
+            # writers; use a connection pool sized for the workload.
+            _engine = create_engine(
+                url,
+                echo=False,
+                future=True,
+                pool_pre_ping=True,
+                pool_size=settings.db_pool_size,
+                max_overflow=settings.db_max_overflow,
+                pool_recycle=1800,
+            )
     return _engine
 
 

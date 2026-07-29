@@ -12,7 +12,9 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY config/ config/
 COPY src/ src/
-RUN pip install --no-cache-dir .
+# Include the Postgres driver so DATABASE_URL can switch backends without
+# rebuilding; SQLite remains the default when DATABASE_URL is empty.
+RUN pip install --no-cache-dir ".[postgres]"
 
 # Run as a non-root user and let it own the data volume.
 RUN useradd --system --create-home --home-dir /home/techdesk techdesk \

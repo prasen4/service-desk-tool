@@ -3,11 +3,13 @@
 How to run the Tech Desk Intelligence platform on a single AWS EC2 instance.
 Two supported paths: a native **systemd** service (recommended) or **Docker**.
 
-> **Architecture note — run one process.** Background jobs, the in-memory job
-> registry that powers the Activity view, and the APScheduler all live inside a
-> single process. Do **not** scale to multiple workers/replicas without first
-> moving those to a shared store (Redis/Celery + Postgres). Vertical scaling
-> (a bigger instance) is the supported way to add capacity today.
+> **Architecture note — one app process today.** Background jobs, the in-memory
+> job registry that powers the Activity view, and the APScheduler all live inside
+> a single process. A single instance handles many concurrent users comfortably
+> — and with PostgreSQL (below) it handles many concurrent **writers** too.
+> Running **multiple app instances** additionally requires externalizing three
+> things (see [Database & scaling](#database--scaling)): the database (Postgres),
+> report file storage (shared EFS/S3), and jobs + scheduler (a shared queue).
 
 ---
 
@@ -72,6 +74,19 @@ docker compose logs -f
 The container binds to `127.0.0.1:8080`; front it with nginx exactly as above.
 Data persists in the `tech-desk-data` named volume.
 
+### Docker + PostgreSQL (concurrent writers)
+
+```bash
+# in .env:
+DATABASE_URL=postgresql+psycopg://techdesk:techdesk@db:5432/techdesk
+
+docker compose --profile postgres up -d --build
+```
+
+This starts a local Postgres 16 container alongside the app. For production on
+EC2, prefer **AWS RDS** and point `DATABASE_URL` at it instead of the compose
+`db` service.
+
 ## 4. Configuration reference
 
 All configuration is environment-driven (`.env` or real env vars). Key settings:
@@ -82,10 +97,62 @@ All configuration is environment-driven (`.env` or real env vars). Key settings:
 | `LLM_PROVIDER` | `openai`/`anthropic`/… | Match your key. |
 | `OPENAI_MODEL` | Model id | e.g. `gpt-4o`. |
 | `ENV` | Environment name | Set to `production` (hides error detail, disables `/api/diagnostics`). |
-| `TECH_DESK_DATA_DIR` | DB + reports + logs | A persistent path, e.g. `/opt/techdesk/data`. |
+| `TECH_DESK_DATA_DIR` | Reports + logs (+ SQLite file if used) | A persistent path, e.g. `/opt/techdesk/data`. |
+| `DATABASE_URL` | Database connection | Empty = SQLite fallback. Set to `postgresql+psycopg://…` for concurrent writers. |
+| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | Postgres pool sizing | Defaults `5` / `10` are fine for one instance. |
 | `CORS_ORIGINS` | Allowed browser origins | Set to your domain, **not** `*`, if calling the API cross-origin. |
 | `SCHEDULER_ENABLED` | Automated daily/weekly/monthly runs | `true` to enable unattended reports. |
 | `LOG_LEVEL` | Logging verbosity | `INFO`. |
+
+## Database & scaling
+
+The app uses SQLAlchemy and runs on either backend:
+
+| Backend | When | Setup |
+|---|---|---|
+| **SQLite** (default) | Single instance, light write volume | None — a file is created in `TECH_DESK_DATA_DIR`. |
+| **PostgreSQL** | Many concurrent writers/users, managed backups/HA | Set `DATABASE_URL`; install the driver. |
+
+SQLite is the automatic fallback: if `DATABASE_URL` is empty, the app uses the
+local file. Set `DATABASE_URL` to switch to Postgres — no code changes.
+
+### Point the app at PostgreSQL
+
+```bash
+# Install the driver (in the app's virtualenv)
+/opt/techdesk/venv/bin/pip install "psycopg[binary]"
+# or from the repo:  pip install -e ".[postgres]"
+
+# In /opt/techdesk/app/.env
+DATABASE_URL=postgresql+psycopg://techdesk:password@db-host:5432/techdesk
+DB_POOL_SIZE=5          # connections held open per app process
+DB_MAX_OVERFLOW=10      # extra burst connections
+```
+
+Provision Postgres with **AWS RDS** (managed backups, failover) or a local
+server. Create the database and user, then restart the app — tables are created
+automatically on first startup. Confirm the active backend:
+
+```bash
+curl -s http://127.0.0.1:8080/api/health | grep -o '"database":"[^"]*"'
+```
+
+### Running more than one app instance
+
+Postgres removes the database write bottleneck, but three things are still
+per-process and must be externalized before load-balancing multiple instances:
+
+1. **Report files** — written under `TECH_DESK_DATA_DIR/reports/`. Put this on
+   shared storage (**EFS**) or object storage (**S3**) so any instance can serve
+   any report.
+2. **Background jobs** — the job registry is in-memory, so a job on instance A is
+   invisible to instance B. Move to a shared queue/worker (**Celery/RQ + Redis**).
+3. **Scheduler** — APScheduler would fire on every instance. Run it as a single
+   dedicated worker, or add a leader lock (e.g. Postgres advisory lock).
+
+Until then, the supported topology is **one app instance + PostgreSQL**, which
+already serves many concurrent users and writers reliably. Scale that instance
+vertically as needed.
 
 ## 5. Operations
 
@@ -105,14 +172,17 @@ cd /path/to/checkout && git pull && sudo bash deploy/deploy.sh
 
 ### Backups
 
-Everything lives under `TECH_DESK_DATA_DIR`. Back it up (the SQLite DB uses WAL,
-so copy `tech_desk.db*`):
+**SQLite (default):** everything lives under `TECH_DESK_DATA_DIR`. Copy the WAL
+set while the app is stopped:
 
 ```bash
 sudo systemctl stop techdesk
 sudo tar czf techdesk-backup-$(date +%F).tgz -C /opt/techdesk data
 sudo systemctl start techdesk
 ```
+
+**PostgreSQL:** back up with `pg_dump` (or enable automated RDS snapshots) and
+separately archive `TECH_DESK_DATA_DIR/reports/` for the generated files.
 
 ## 6. Security checklist
 

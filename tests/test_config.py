@@ -40,6 +40,26 @@ def test_ensure_directories_creates_tree(tmp_path: Path):
     assert (tmp_path / "nested" / "logs").is_dir()
 
 
+def test_database_url_defaults_to_sqlite(tmp_path: Path):
+    settings = _settings(TECH_DESK_DATA_DIR=tmp_path)
+    assert settings.is_sqlite is True
+    assert settings.db_backend == "sqlite"
+    assert settings.database_url.startswith("sqlite:///")
+
+
+def test_database_url_override_takes_precedence():
+    url = "postgresql+psycopg://u:p@localhost:5432/techdesk"
+    settings = _settings(DATABASE_URL=url)
+    assert settings.database_url == url
+    assert settings.is_sqlite is False
+    assert settings.db_backend == "postgresql"
+
+
+def test_blank_database_url_falls_back_to_sqlite(tmp_path: Path):
+    settings = _settings(TECH_DESK_DATA_DIR=tmp_path, DATABASE_URL="   ")
+    assert settings.is_sqlite is True
+
+
 def test_desk_definitions_have_required_fields():
     desks = list_desk_definitions()
     assert len(desks) == 5

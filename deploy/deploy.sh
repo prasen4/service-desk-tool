@@ -42,7 +42,9 @@ if [ ! -d "${VENV_DIR}" ]; then
     python3 -m venv "${VENV_DIR}"
 fi
 "${VENV_DIR}/bin/pip" install --upgrade pip
-"${VENV_DIR}/bin/pip" install "${APP_DIR}"
+# Include the Postgres driver so DATABASE_URL can be flipped without a reinstall.
+# SQLite remains the default when DATABASE_URL is empty.
+"${VENV_DIR}/bin/pip" install "${APP_DIR}[postgres]"
 
 if [ ! -f "${APP_DIR}/.env" ]; then
     echo "==> Seeding .env from example (EDIT THIS with your real API key + settings)"
