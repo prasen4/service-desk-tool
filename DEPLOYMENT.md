@@ -110,7 +110,17 @@ docker compose logs -f
 The container binds to `127.0.0.1:8080`; front it with nginx exactly as above.
 Data persists in the `tech-desk-data` named volume.
 
-### Docker + PostgreSQL (concurrent writers)
+The app runs as a non-root `techdesk` user (uid `999`) inside the container,
+and writes back to `config/tech_desks.yaml` when new vendors are auto-tracked.
+On a fresh clone, the host `config/` directory is owned by whatever user ran
+`git clone` (e.g. `ubuntu`), which the container user can't write to. Fix once
+after cloning:
+
+```bash
+sudo chown -R 999:999 config/
+```
+
+
 
 ```bash
 # in .env:
