@@ -13,7 +13,9 @@ services:
       DATABASE_URL: ${DATABASE_URL:-}
     volumes:
       - tech-desk-data:/data
-      - ./config:/app/config:ro
+      # Read-write: the app persists new vendors added to a desk back into
+      # tech_desks.yaml (see config.py's add_vendor_to_desk).
+      - ./config:/app/config
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health')"]
