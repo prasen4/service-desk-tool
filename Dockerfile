@@ -23,13 +23,17 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY config/ config/
 COPY src/ src/
+
+# Bring in the built React app BEFORE `pip install`, since `pip install .`
+# (non-editable) copies package files into site-packages at that moment —
+# the app imports from that installed copy, not this /app/src tree, so this
+# must land here first or the running app silently falls back to the legacy
+# static/index.html at runtime (per main.py's dashboard route).
+COPY --from=frontend-build /build/src/tech_desk/api/web/dist/ src/tech_desk/api/web/dist/
+
 # Include the Postgres driver so DATABASE_URL can switch backends without
 # rebuilding; SQLite remains the default when DATABASE_URL is empty.
 RUN pip install --no-cache-dir ".[postgres]"
-
-# Bring in the built React app (falls back to the legacy static/index.html
-# at runtime if this directory doesn't exist, per main.py's dashboard route).
-COPY --from=frontend-build /build/src/tech_desk/api/web/dist/ src/tech_desk/api/web/dist/
 
 # Run as a non-root user and let it own the data volume.
 RUN useradd --system --create-home --home-dir /home/techdesk techdesk \
