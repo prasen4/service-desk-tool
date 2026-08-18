@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tech_desk.config import Settings, list_desk_definitions
+import pytest
+
+from tech_desk.config import Settings, add_vendor_to_desk, list_desk_definitions
 
 
 def _settings(**overrides) -> Settings:
@@ -67,3 +69,48 @@ def test_desk_definitions_have_required_fields():
         assert desk.id and desk.code and desk.name
         assert desk.search_queries
         assert desk.key_vendors
+
+
+@pytest.fixture
+def desk_config_copy(tmp_path: Path) -> Path:
+    """A writable copy of the real desk config, so vendor-add tests don't mutate the repo file."""
+    real_path = Path("config/tech_desks.yaml")
+    copy_path = tmp_path / "tech_desks.yaml"
+    copy_path.write_text(real_path.read_text(encoding="utf-8"), encoding="utf-8")
+    return copy_path
+
+
+def test_add_vendor_to_desk_appends_and_propagates(desk_config_copy: Path):
+    before = list_desk_definitions(desk_config_copy)
+    apps_before = next(d for d in before if d.id == "applications")
+    assert "Snowflake" not in apps_before.key_vendors
+
+    updated = add_vendor_to_desk("applications", "Snowflake", desk_config_copy)
+
+    assert updated.id == "applications"
+    assert "Snowflake" in updated.key_vendors
+    # Re-parsing the file confirms the write actually landed on disk, and that
+    # every other desk/field survived the edit untouched.
+    after = list_desk_definitions(desk_config_copy)
+    assert len(after) == len(before)
+    apps_after = next(d for d in after if d.id == "applications")
+    assert apps_after.key_vendors == apps_before.key_vendors + ["Snowflake"]
+    for other in after:
+        if other.id != "applications":
+            assert other.model_dump() == next(d for d in before if d.id == other.id).model_dump()
+
+
+def test_add_vendor_to_desk_rejects_duplicate(desk_config_copy: Path):
+    add_vendor_to_desk("applications", "Snowflake", desk_config_copy)
+    with pytest.raises(ValueError, match="already tracked"):
+        add_vendor_to_desk("applications", "snowflake", desk_config_copy)  # case-insensitive dup
+
+
+def test_add_vendor_to_desk_rejects_unknown_desk(desk_config_copy: Path):
+    with pytest.raises(LookupError, match="Unknown desk"):
+        add_vendor_to_desk("not-a-real-desk", "Snowflake", desk_config_copy)
+
+
+def test_add_vendor_to_desk_rejects_blank_name(desk_config_copy: Path):
+    with pytest.raises(ValueError, match="required"):
+        add_vendor_to_desk("applications", "   ", desk_config_copy)

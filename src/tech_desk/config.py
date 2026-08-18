@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import threading
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -22,6 +24,11 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(default="", validation_alias="OPENAI_API_KEY")
     openai_base_url: str = Field(default="https://api.openai.com/v1", validation_alias="OPENAI_BASE_URL")
     openai_model: str = Field(default="gpt-4o", validation_alias="OPENAI_MODEL")
+
+    # Azure OpenAI (enterprise) only needs an API version in addition to the
+    # fields above — the Azure resource endpoint is stored in OPENAI_BASE_URL
+    # and the deployment name is stored in OPENAI_MODEL.
+    azure_openai_api_version: str = Field(default="2024-10-21", validation_alias="AZURE_OPENAI_API_VERSION")
 
     tech_desk_data_dir: Path = Field(default=Path("./data"), validation_alias="TECH_DESK_DATA_DIR")
     tech_desk_host: str = Field(default="0.0.0.0", validation_alias="TECH_DESK_HOST")
@@ -152,3 +159,76 @@ def resolve_desks(
 
 
 ReportPeriod = Literal["daily", "weekly", "monthly"]
+
+_config_write_lock = threading.Lock()
+
+_DESK_HEADER_RE = re.compile(r"^  - id:\s*(\S+)\s*$")
+_KEY_VENDORS_RE = re.compile(r"^    key_vendors:\s*$")
+_LIST_ITEM_RE = re.compile(r"^      - (.+)$")
+
+
+def add_vendor_to_desk(
+    desk_id: str,
+    vendor_name: str,
+    config_path: Path | None = None,
+) -> TechDeskDefinition:
+    """Append a vendor to a desk's ``key_vendors`` list in ``tech_desks.yaml``.
+
+    This is the single source of truth consumed by research (vendor-targeted
+    search queries), the Vendor News registry, and report generation — so
+    adding a vendor here automatically propagates everywhere else without any
+    further wiring, since none of those readers cache the parsed config.
+
+    Edits the YAML in place with a small line-based patch (rather than a full
+    ``yaml.safe_dump`` round-trip) so the file's existing comments, key order,
+    and formatting are preserved exactly.
+    """
+    name = vendor_name.strip()
+    if not name:
+        raise ValueError("Vendor name is required.")
+    if len(name) > 128:
+        raise ValueError("Vendor name is too long (max 128 characters).")
+
+    path = config_path or get_settings().config_path
+    if not path.is_absolute():
+        path = Path.cwd() / path
+
+    with _config_write_lock:
+        text = path.read_text(encoding="utf-8")
+        lines = text.splitlines()
+
+        desk_start = next(
+            (i for i, line in enumerate(lines) if (m := _DESK_HEADER_RE.match(line)) and m.group(1) == desk_id),
+            None,
+        )
+        if desk_start is None:
+            all_desks = list_desk_definitions(config_path)
+            valid = ", ".join(d.id for d in all_desks)
+            raise LookupError(f"Unknown desk id: '{desk_id}'. Valid options: {valid}")
+
+        desk_end = len(lines)
+        for j in range(desk_start + 1, len(lines)):
+            if _DESK_HEADER_RE.match(lines[j]) or re.match(r"^\S", lines[j]):
+                desk_end = j
+                break
+
+        kv_line = next((j for j in range(desk_start, desk_end) if _KEY_VENDORS_RE.match(lines[j])), None)
+        if kv_line is None:
+            raise ValueError(f"Desk '{desk_id}' has no key_vendors list to add to.")
+
+        insert_at = kv_line + 1
+        existing: list[str] = []
+        for j in range(kv_line + 1, desk_end):
+            m = _LIST_ITEM_RE.match(lines[j])
+            if not m:
+                break
+            existing.append(m.group(1).strip())
+            insert_at = j + 1
+
+        if any(v.lower() == name.lower() for v in existing):
+            raise ValueError(f"'{name}' is already tracked on this desk.")
+
+        lines.insert(insert_at, f"      - {name}")
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    return next(d for d in list_desk_definitions(config_path) if d.id == desk_id)

@@ -28,6 +28,14 @@ PROVIDERS: dict[str, dict[str, Any]] = {
         "key_hint": "sk-ant-...",
         "docs": "https://console.anthropic.com/settings/keys",
     },
+    "azure_openai": {
+        "label": "Azure OpenAI",
+        "sdk": "azure_openai",
+        "base_url": "",
+        "key_hint": "your-azure-api-key",
+        "docs": "https://learn.microsoft.com/azure/ai-services/openai/",
+        "requires_deployment": True,
+    },
     "google": {
         "label": "Google (Gemini)",
         "sdk": "openai",
@@ -48,13 +56,6 @@ PROVIDERS: dict[str, dict[str, Any]] = {
         "base_url": "https://api.mistral.ai/v1",
         "key_hint": "...",
         "docs": "https://console.mistral.ai/api-keys",
-    },
-    "deepseek": {
-        "label": "DeepSeek",
-        "sdk": "openai",
-        "base_url": "https://api.deepseek.com",
-        "key_hint": "sk-...",
-        "docs": "https://platform.deepseek.com/api_keys",
     },
     "openai_compatible": {
         "label": "Custom (OpenAI-compatible)",
@@ -93,9 +94,6 @@ MODELS: list[dict[str, Any]] = [
     # —— Mistral ——
     {"id": "mistral-large-latest", "provider": "mistral", "label": "Mistral Large", "input": 2.00, "output": 6.00, "context": 128000},
     {"id": "mistral-small-latest", "provider": "mistral", "label": "Mistral Small", "input": 0.20, "output": 0.60, "context": 128000},
-    # —— DeepSeek ——
-    {"id": "deepseek-chat", "provider": "deepseek", "label": "DeepSeek-V3 (chat)", "input": 0.27, "output": 1.10, "context": 64000},
-    {"id": "deepseek-reasoner", "provider": "deepseek", "label": "DeepSeek-R1 (reasoner)", "input": 0.55, "output": 2.19, "context": 64000},
 ]
 
 _MODEL_INDEX = {m["id"]: m for m in MODELS}
@@ -127,6 +125,7 @@ def get_catalog() -> dict[str, Any]:
                 "base_url": p["base_url"],
                 "key_hint": p["key_hint"],
                 "docs": p["docs"],
+                "requires_deployment": p.get("requires_deployment", False),
                 "models": [
                     {k: m[k] for k in ("id", "label", "input", "output", "context")}
                     for m in MODELS

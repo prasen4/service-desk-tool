@@ -1,3 +1,14 @@
+FROM node:20-slim AS frontend-build
+
+WORKDIR /build
+# Mirror the repo layout so vite.config.ts's relative
+# build.outDir (../src/tech_desk/api/web/dist) resolves correctly.
+# (Vite creates the output directory tree itself, so src/ doesn't need to
+# pre-exist here.)
+COPY frontend/ frontend/
+WORKDIR /build/frontend
+RUN npm ci && npm run build
+
 FROM python:3.12-slim
 
 # WeasyPrint system dependencies for PDF rendering.
@@ -15,6 +26,10 @@ COPY src/ src/
 # Include the Postgres driver so DATABASE_URL can switch backends without
 # rebuilding; SQLite remains the default when DATABASE_URL is empty.
 RUN pip install --no-cache-dir ".[postgres]"
+
+# Bring in the built React app (falls back to the legacy static/index.html
+# at runtime if this directory doesn't exist, per main.py's dashboard route).
+COPY --from=frontend-build /build/src/tech_desk/api/web/dist/ src/tech_desk/api/web/dist/
 
 # Run as a non-root user and let it own the data volume.
 RUN useradd --system --create-home --home-dir /home/techdesk techdesk \

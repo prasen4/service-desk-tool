@@ -15,6 +15,10 @@ desks:
       - Google Cloud
       - CoreWeave
       - Lambda Labs
+      - Alphabet
+      - Amazon
+      - Mavvrik
+      - NTT DATA
     areas:
       - cloud infrastructure
       - GPU compute pricing
@@ -43,6 +47,8 @@ desks:
       - Cohere
       - Hugging Face
       - xAI
+      - Microsoft
+      - Alibaba
     areas:
       - foundation models
       - domain-specific LLMs
@@ -73,6 +79,12 @@ desks:
       - Microsoft Azure AI
       - Google Vertex AI
       - Arize AI
+      - Google Cloud
+      - Microsoft
+      - Google
+      - Anaconda
+      - NVIDIA
+      - Google DeepMind
     sub_areas:
       datacentric:
         - prompt engineering

@@ -63,6 +63,7 @@ def _orm_to_update(orm: UpdateORM) -> CuratedUpdate:
         tags=json_to_tags(orm.tags_json),
         key_takeaways=json_to_tags(orm.key_takeaways_json),
         stakeholder_impact=orm.stakeholder_impact,
+        who_is_affected_first=getattr(orm, "who_is_affected_first", "") or "",
         raw_snippet=orm.raw_snippet,
         vendor=getattr(orm, "vendor", "") or "",
         image_url=image_url,
@@ -82,12 +83,14 @@ class ReportGenerator:
         *,
         end_date: datetime | None = None,
         desk_keys: list[str] | None = None,
+        custom_instructions: str | None = None,
     ) -> GeneratedReport:
         init_db()
         session = get_session_factory()()
         config = load_desk_config()
         reporting_cfg = config.get("reporting", {}).get(period, {})
         max_per_desk = reporting_cfg.get("max_items_per_desk", 20)
+        custom_instructions = (custom_instructions or "").strip()
 
         desks = resolve_desks(desk_keys)
         period_start, period_end = _period_bounds(period, end_date)
@@ -108,10 +111,16 @@ class ReportGenerator:
                     .all()
                 )
                 updates = [_orm_to_update(u) for u in updates_orm]
-                section = self._build_desk_section(desk, updates, period, reporting_cfg)
+                vendor_notes = self._collect_vendor_notes(session, desk)
+                section = self._build_desk_section(
+                    desk, updates, period, reporting_cfg,
+                    vendor_notes=vendor_notes, custom_instructions=custom_instructions,
+                )
                 sections.append(section)
 
-            executive_summary = self._build_executive_summary(period, sections, reporting_cfg, desks)
+            executive_summary = self._build_executive_summary(
+                period, sections, reporting_cfg, desks, custom_instructions=custom_instructions,
+            )
 
             report = GeneratedReport(
                 id=str(uuid.uuid4()),
@@ -142,6 +151,7 @@ class ReportGenerator:
                 html_path=str(paths.get("html", "")),
                 markdown_path=str(paths.get("markdown", "")),
                 pdf_path=str(paths.get("pdf")) if paths.get("pdf") else None,
+                custom_instructions=custom_instructions or None,
             )
             session.add(orm)
             session.commit()
@@ -167,13 +177,29 @@ class ReportGenerator:
             return f"Gen AI {labels[period]} ({codes}) — {date_range}"
         return f"Gen AI {labels[period]} — {date_range}"
 
+    def _collect_vendor_notes(self, session, desk: TechDeskDefinition) -> dict[str, str]:
+        """Recent analyst CRM notes per key vendor on this desk, for feeding
+        into report-generation prompts (vendor-centric and overall)."""
+        from tech_desk import vendor_profiles
+
+        notes: dict[str, str] = {}
+        for vendor_name in desk.key_vendors:
+            text = vendor_profiles.get_recent_notes_text(session, vendor_name)
+            if text:
+                notes[vendor_name] = text
+        return notes
+
     def _build_desk_section(
         self,
         desk: TechDeskDefinition,
         updates: list[CuratedUpdate],
         period: ReportPeriod,
         cfg: dict,
+        *,
+        vendor_notes: dict[str, str] | None = None,
+        custom_instructions: str = "",
     ) -> DeskReportSection:
+        vendor_notes = vendor_notes or {}
         section = DeskReportSection(
             desk_id=desk.id,
             desk_name=desk.name,
@@ -188,6 +214,7 @@ class ReportGenerator:
                 section.vendor_sections = self.vendor_builder.build_vendor_sections(
                     desk, [], max_per_vendor=cfg.get("max_items_per_vendor", 5),
                     period=period, only_active_vendors=cfg.get("only_active_vendors", period == "daily"),
+                    vendor_notes=vendor_notes, custom_instructions=custom_instructions,
                 )
             return section
 
@@ -197,6 +224,7 @@ class ReportGenerator:
         vendor_sections = self.vendor_builder.build_vendor_sections(
             desk, updates, max_per_vendor=max_per_vendor, period=period,
             only_active_vendors=only_active,
+            vendor_notes=vendor_notes, custom_instructions=custom_instructions,
         )
         section.vendor_sections = vendor_sections
 
@@ -206,7 +234,10 @@ class ReportGenerator:
         updates_text = self._format_updates_for_llm(updates)
         vendors_list = ", ".join(desk.key_vendors) if desk.key_vendors else "N/A"
 
-        prompt = self._desk_section_prompt(desk, period, vendor_digest, updates_text, vendors_list, len(updates), cfg)
+        prompt = self._desk_section_prompt(
+            desk, period, vendor_digest, updates_text, vendors_list, len(updates), cfg,
+            custom_instructions=custom_instructions,
+        )
 
         include_trends = cfg.get("include_trend_analysis", period == "monthly")
         include_recs = cfg.get("include_recommendations", period != "daily")
@@ -237,7 +268,10 @@ class ReportGenerator:
         vendors_list: str,
         update_count: int,
         cfg: dict,
+        *,
+        custom_instructions: str = "",
     ) -> str:
+        instructions_block = f"\nAdditional guidance for this run: {custom_instructions}\n" if custom_instructions else ""
         if period == "daily":
             max_highlights = cfg.get("max_highlights", 3)
             return f"""Generate a concise DAILY BRIEF section for Cotiviti's "{desk.name}" tech desk.
@@ -245,7 +279,7 @@ Keep it scannable — leadership reads this in under 2 minutes.
 
 Desk focus: {desk.description}
 Key vendors: {vendors_list}
-
+{instructions_block}
 Vendor snapshot:
 {vendor_digest}
 
@@ -267,7 +301,7 @@ Respond in JSON:
 
 Desk focus: {desk.description}
 Key vendors: {vendors_list}
-
+{instructions_block}
 Vendor snapshot:
 {vendor_digest}
 
@@ -289,7 +323,7 @@ Respond in JSON:
 Desk focus: {desk.description}
 Areas: {', '.join(desk.areas)}
 Key vendors: {vendors_list}
-
+{instructions_block}
 Vendor snapshot:
 {vendor_digest}
 
@@ -312,6 +346,8 @@ Respond in JSON:
         sections: list[DeskReportSection],
         cfg: dict,
         desks: list[TechDeskDefinition],
+        *,
+        custom_instructions: str = "",
     ) -> str:
         if not cfg.get("include_executive_summary", True):
             return ""
@@ -324,12 +360,13 @@ Respond in JSON:
         digest = "\n".join(
             f"- {s.desk_name}: {s.executive_summary or 'No updates'}" for s in focus_sections
         )
+        instructions_block = f"\nAdditional guidance for this run: {custom_instructions}\n" if custom_instructions else ""
 
         if len(desks) == 1:
             sentences = "2-3 sentences" if period == "daily" else "4-6 sentences"
             prompt = f"""Write a {period} executive summary ({sentences}) for Cotiviti leadership on the "{desks[0].name}" desk.
 Focus on what matters for Cotiviti's healthcare analytics mission.
-
+{instructions_block}
 Desk summary:
 {digest}
 
@@ -338,7 +375,7 @@ Write only the paragraph, no JSON."""
             sentences = "2-3 sentences" if period == "daily" else "4-6 sentences"
             prompt = f"""Write a {period} executive summary ({sentences}) for Cotiviti leadership.
 Lead with the most strategically significant vendor developments.
-
+{instructions_block}
 Desk summaries:
 {digest}
 

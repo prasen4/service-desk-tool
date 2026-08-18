@@ -6,7 +6,8 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from tech_desk.config import ReportPeriod, get_settings, resolve_desks
+from tech_desk import vendor_profiles
+from tech_desk.config import ReportPeriod, add_vendor_to_desk, get_settings, resolve_desks
 from tech_desk.database import ResearchRunORM, UpdateORM, init_db, research_run_from_orm, tags_to_json
 from tech_desk.llm import LLMClient
 from tech_desk.models import ResearchRunResult
@@ -51,17 +52,21 @@ class ResearchCollector:
         period: ReportPeriod = "daily",
         *,
         desk_keys: list[str] | None = None,
+        custom_instructions: str | None = None,
     ) -> ResearchRunResult:
         init_db()
         session = self._get_session()
         desks = resolve_desks(desk_keys)
+        custom_instructions = (custom_instructions or "").strip()
 
-        run = ResearchRunORM(period=period, status="running")
+        run = ResearchRunORM(period=period, status="running", custom_instructions=custom_instructions or None)
         session.add(run)
         session.flush()
 
         total_updates = 0
         desks_processed = 0
+        vendors_added_overall: list[str] = []
+        notes_cache: dict[str, str] = {}
         result: ResearchRunResult | None = None
 
         try:
@@ -72,10 +77,46 @@ class ResearchCollector:
                 results = self.searcher.search_desk(desk, depth_multiplier=depth)
                 logger.info("Found %d raw results for %s", len(results), desk.name)
 
+                # Research isn't limited to already-tracked vendors — the analyzer
+                # surfaces any relevant vendor for the desk's focus areas. Any newly
+                # discovered vendor not yet tracked gets auto-added to key_vendors,
+                # so it's picked up by future research runs and report generation too.
+                tracked_lower = {v.lower() for v in desk.key_vendors}
+                newly_tracked_this_desk: set[str] = set()
+
                 for result_item in results:
-                    curated = self.analyzer.analyze_result(desk, result_item)
+                    vendor_notes = ""
+                    if result_item.target_vendor:
+                        vendor_notes = notes_cache.setdefault(
+                            result_item.target_vendor.lower(),
+                            vendor_profiles.get_recent_notes_text(session, result_item.target_vendor),
+                        )
+                    curated = self.analyzer.analyze_result(
+                        desk,
+                        result_item,
+                        vendor_notes=vendor_notes,
+                        custom_instructions=custom_instructions,
+                    )
                     if curated is None:
                         continue
+
+                    vendor_name = (curated.vendor or "").strip()
+                    if (
+                        vendor_name
+                        and vendor_name.lower() not in ("other", "unknown", "n/a")
+                        and len(vendor_name) <= 128
+                        and vendor_name.lower() not in tracked_lower
+                    ):
+                        try:
+                            add_vendor_to_desk(desk.id, vendor_name)
+                        except (ValueError, LookupError) as exc:
+                            logger.debug(
+                                "Skipped auto-tracking vendor '%s' on %s: %s", vendor_name, desk.name, exc
+                            )
+                        else:
+                            tracked_lower.add(vendor_name.lower())
+                            newly_tracked_this_desk.add(vendor_name)
+                            logger.info("Auto-tracked new vendor '%s' discovered on %s", vendor_name, desk.name)
 
                     if self.settings.image_fetch_during_research and not curated.image_url:
                         curated.image_url = resolve_update_image(
@@ -104,6 +145,7 @@ class ResearchCollector:
                         tags_json=tags_to_json(curated.tags),
                         key_takeaways_json=tags_to_json(curated.key_takeaways),
                         stakeholder_impact=curated.stakeholder_impact,
+                        who_is_affected_first=curated.who_is_affected_first,
                         raw_snippet=curated.raw_snippet,
                         vendor=curated.vendor,
                         image_url=curated.image_url,
@@ -112,6 +154,7 @@ class ResearchCollector:
                     session.add(orm)
                     total_updates += 1
 
+                vendors_added_overall.extend(f"{v} ({desk.code})" for v in sorted(newly_tracked_this_desk))
                 desks_processed += 1
                 session.flush()
 
@@ -119,9 +162,11 @@ class ResearchCollector:
             run.completed_at = now_utc()
             run.desks_processed = desks_processed
             run.updates_found = total_updates
+            meta = {"vendors_added": vendors_added_overall}
             if desk_keys:
-                meta = {"desk_ids": [d.id for d in desks], "desk_codes": [d.code for d in desks]}
-                run.metadata_json = json.dumps(meta)
+                meta["desk_ids"] = [d.id for d in desks]
+                meta["desk_codes"] = [d.code for d in desks]
+            run.metadata_json = json.dumps(meta)
             session.commit()
             logger.info("Research run complete: %d new updates across %d desks", total_updates, desks_processed)
             session.refresh(run)

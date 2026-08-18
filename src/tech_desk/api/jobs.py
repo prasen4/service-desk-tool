@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import uuid
@@ -45,6 +46,65 @@ class Job:
         }
 
 
+def _persist(job: Job) -> None:
+    """Write-through a job's current state to the DB so the Activity view
+    survives process restarts/redeploys (the in-memory dict alone does not).
+    Never let telemetry persistence take down a running job.
+    """
+    try:
+        from tech_desk.database import JobORM, get_session_factory
+
+        session = get_session_factory()()
+        try:
+            session.merge(
+                JobORM(
+                    id=job.id,
+                    job_type=job.job_type,
+                    status=job.status.value,
+                    message=job.message,
+                    progress=job.progress,
+                    created_at=job.created_at.replace(tzinfo=None),
+                    completed_at=job.completed_at.replace(tzinfo=None) if job.completed_at else None,
+                    result_json=json.dumps(job.result) if job.result is not None else None,
+                    error=job.error,
+                )
+            )
+            session.commit()
+        finally:
+            session.close()
+    except Exception:
+        logger.debug("Job persistence skipped for %s", job.id, exc_info=True)
+
+
+def _job_from_orm(orm: "Any") -> Job:
+    return Job(
+        id=orm.id,
+        job_type=orm.job_type,
+        status=JobStatus(orm.status),
+        message=orm.message,
+        progress=orm.progress,
+        created_at=orm.created_at.replace(tzinfo=timezone.utc),
+        completed_at=orm.completed_at.replace(tzinfo=timezone.utc) if orm.completed_at else None,
+        result=json.loads(orm.result_json) if orm.result_json else None,
+        error=orm.error,
+    )
+
+
+def _load_recent_from_db(limit: int = 100) -> list[Job]:
+    try:
+        from tech_desk.database import JobORM, get_session_factory
+
+        session = get_session_factory()()
+        try:
+            rows = session.query(JobORM).order_by(JobORM.created_at.desc()).limit(limit).all()
+            return [_job_from_orm(r) for r in rows]
+        finally:
+            session.close()
+    except Exception:
+        logger.debug("Could not load job history from DB", exc_info=True)
+        return []
+
+
 class JobManager:
     """In-process background job runner for long-running pipeline tasks."""
 
@@ -56,6 +116,10 @@ class JobManager:
 
     def start(self) -> None:
         self._running = True
+        # Rehydrate recent job history from the DB so the Activity view isn't
+        # empty right after a restart/redeploy.
+        for job in _load_recent_from_db(limit=100):
+            self._jobs.setdefault(job.id, job)
 
     def shutdown(self) -> None:
         self._running = False
@@ -66,11 +130,12 @@ class JobManager:
         job = Job(id=job_id, job_type=job_type)
         with self._lock:
             self._jobs[job_id] = job
-            # Keep last 100 jobs
+            # Keep last 100 jobs in memory (DB retains full history)
             if len(self._jobs) > 100:
                 oldest = sorted(self._jobs.values(), key=lambda j: j.created_at)[:20]
                 for old in oldest:
                     self._jobs.pop(old.id, None)
+        _persist(job)
 
         def _progress(message: str, progress: int) -> None:
             self._update(job_id, message=message, progress=min(progress, 99))
@@ -108,10 +173,23 @@ class JobManager:
                 return
             for key, value in fields.items():
                 setattr(job, key, value)
+            snapshot = job
+        _persist(snapshot)
 
     def get(self, job_id: str) -> Job | None:
         with self._lock:
-            return self._jobs.get(job_id)
+            job = self._jobs.get(job_id)
+        if job:
+            return job
+        # Not in the in-memory cache (e.g. right after a restart) — fall back to the DB.
+        from tech_desk.database import JobORM, get_session_factory
+
+        session = get_session_factory()()
+        try:
+            orm = session.get(JobORM, job_id)
+            return _job_from_orm(orm) if orm else None
+        finally:
+            session.close()
 
     def list_recent(self, limit: int = 20) -> list[Job]:
         with self._lock:

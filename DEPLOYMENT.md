@@ -31,10 +31,11 @@ git clone <your-repo-url> techdesk && cd techdesk
 sudo bash deploy/deploy.sh
 ```
 
-The script installs system dependencies, creates the `techdesk` service user,
-builds a virtualenv under `/opt/techdesk/venv`, installs the app, seeds
-`/opt/techdesk/app/.env`, and starts the `techdesk` systemd service bound to
-`127.0.0.1:8080`.
+The script installs system dependencies (including Node.js, used only to build
+the frontend), creates the `techdesk` service user, builds the React frontend
+(`frontend/` → `npm ci && npm run build`), builds a virtualenv under
+`/opt/techdesk/venv`, installs the app, seeds `/opt/techdesk/app/.env`, and
+starts the `techdesk` systemd service bound to `127.0.0.1:8080`.
 
 Then set your real configuration:
 
@@ -64,6 +65,41 @@ sudo htpasswd -c /etc/nginx/.htpasswd techdesk
 ```
 
 ## 3. Deploy with Docker (alternative)
+
+Docker doesn't require Ubuntu — install the Docker Engine + Compose plugin for
+whatever distro you're on, then everything else is identical:
+
+```bash
+# Ubuntu 22.04:
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Amazon Linux 2023:
+sudo dnf install -y docker
+sudo systemctl enable --now docker
+sudo mkdir -p /usr/libexec/docker/cli-plugins
+sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
+  -o /usr/libexec/docker/cli-plugins/docker-compose
+sudo chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+```
+
+Then, from a checkout of the repo on the instance:
+
+```bash
+git clone <your-repo-url> techdesk && cd techdesk
+sudo bash deploy/deploy-docker.sh   # seeds .env on first run — edit it, then re-run
+```
+
+`deploy/deploy-docker.sh` is the Docker-path equivalent of `deploy/deploy.sh`
+(the systemd path) — it seeds `.env` from the example on first run, then on
+subsequent runs builds the image (frontend build is baked into the
+multi-stage `Dockerfile`) and health-checks the container. It's safe to re-run
+after a `git pull` to deploy new code. Equivalent manual commands:
 
 ```bash
 cp .env.example .env      # edit with your OPENAI_API_KEY and settings
@@ -167,7 +203,8 @@ curl -s http://127.0.0.1:8080/api/health
 curl -s http://127.0.0.1:8080/api/ready
 
 # Update to a new version
-cd /path/to/checkout && git pull && sudo bash deploy/deploy.sh
+cd /path/to/checkout && git pull && sudo bash deploy/deploy.sh          # systemd
+cd /path/to/checkout && git pull && sudo bash deploy/deploy-docker.sh  # docker
 ```
 
 ### Backups

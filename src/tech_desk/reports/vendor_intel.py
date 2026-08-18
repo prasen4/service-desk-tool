@@ -137,6 +137,8 @@ class VendorIntelBuilder:
         max_per_vendor: int = 8,
         period: str = "monthly",
         only_active_vendors: bool = False,
+        vendor_notes: dict[str, str] | None = None,
+        custom_instructions: str = "",
     ) -> list[VendorIntelSection]:
         tracked = desk.key_vendors or []
         if not tracked:
@@ -144,6 +146,7 @@ class VendorIntelBuilder:
 
         updates = _enrich_update_images(updates)
         grouped = group_updates_by_vendor(updates, tracked)
+        vendor_notes = vendor_notes or {}
         sections: list[VendorIntelSection] = []
 
         for vendor in tracked:
@@ -151,7 +154,8 @@ class VendorIntelBuilder:
             if only_active_vendors and not vendor_updates:
                 continue
             section = self._build_single_vendor_section(
-                desk, vendor, vendor_updates, period=period
+                desk, vendor, vendor_updates, period=period,
+                vendor_notes=vendor_notes.get(vendor, ""), custom_instructions=custom_instructions,
             )
             sections.append(section)
 
@@ -164,6 +168,7 @@ class VendorIntelBuilder:
                         "Other Vendors",
                         other_updates,
                         period=period,
+                        custom_instructions=custom_instructions,
                     )
                 )
 
@@ -176,6 +181,8 @@ class VendorIntelBuilder:
         updates: list[CuratedUpdate],
         *,
         period: str,
+        vendor_notes: str = "",
+        custom_instructions: str = "",
     ) -> VendorIntelSection:
         image_url = ""
         from tech_desk.config import get_settings
@@ -202,8 +209,10 @@ class VendorIntelBuilder:
 
         prompts = _period_prompts(period)
         updates_text = _format_vendor_updates(updates)
+        notes_block = f"\nAnalyst notes on {vendor} (context only):\n{vendor_notes}\n" if vendor_notes else ""
+        instructions_block = f"\nAdditional guidance for this run: {custom_instructions}\n" if custom_instructions else ""
         prompt = f"""Generate vendor intelligence for "{vendor}" in the "{desk.name}" desk ({period} report).
-
+{notes_block}{instructions_block}
 Evidence ({len(updates)} updates):
 {updates_text}
 

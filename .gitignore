@@ -32,3 +32,10 @@ htmlcov/
 # Logs
 logs/
 *.log
+
+# Frontend (Node/Vite)
+frontend/node_modules/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+src/tech_desk/api/web/dist/

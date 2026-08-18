@@ -22,7 +22,14 @@ apt-get update -y
 apt-get install -y --no-install-recommends \
     python3 python3-venv python3-pip \
     libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev \
-    shared-mime-info fonts-dejavu-core
+    shared-mime-info fonts-dejavu-core \
+    curl ca-certificates
+
+echo "==> Installing Node.js (for the frontend build)"
+if ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -d. -f1 | tr -d v)" -lt 20 ]; then
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+fi
 
 echo "==> Creating service user and directories"
 if ! id -u "${APP_USER}" >/dev/null 2>&1; then
@@ -35,7 +42,11 @@ echo "==> Syncing application code"
 rsync -a --delete \
     --exclude '.git' --exclude '.venv' --exclude 'data' \
     --exclude '.pytest-data' --exclude '__pycache__' \
+    --exclude 'frontend/node_modules' \
     "${REPO_DIR}/" "${APP_DIR}/"
+
+echo "==> Building frontend"
+( cd "${APP_DIR}/frontend" && npm ci && npm run build )
 
 echo "==> Creating / updating virtualenv"
 if [ ! -d "${VENV_DIR}" ]; then

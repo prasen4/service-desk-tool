@@ -63,6 +63,56 @@ def test_unknown_desk_returns_400(client):
     assert "Unknown desk" in resp.json()["detail"]
 
 
+def test_add_desk_vendor_success(client, monkeypatch):
+    """Route wiring only — the actual file mutation is covered against a tmp
+    config copy in test_config.py, so this test never touches the real
+    config/tech_desks.yaml on disk."""
+    import tech_desk.api.main as main_module
+
+    calls = {}
+
+    def fake_add(desk_id, vendor):
+        calls["desk_id"] = desk_id
+        calls["vendor"] = vendor
+        from tech_desk.config import list_desk_definitions
+
+        return next(d for d in list_desk_definitions() if d.id == desk_id)
+
+    monkeypatch.setattr(main_module, "add_vendor_to_desk", fake_add)
+
+    resp = client.post("/api/desks/applications/vendors", json={"vendor": "Snowflake"})
+    assert resp.status_code == 200
+    assert resp.json()["desk"]["id"] == "applications"
+    assert calls == {"desk_id": "applications", "vendor": "Snowflake"}
+
+
+def test_add_desk_vendor_unknown_desk_404(client, monkeypatch):
+    import tech_desk.api.main as main_module
+
+    def fake_add(desk_id, vendor):
+        raise LookupError(f"Unknown desk id: '{desk_id}'")
+
+    monkeypatch.setattr(main_module, "add_vendor_to_desk", fake_add)
+    resp = client.post("/api/desks/not-real/vendors", json={"vendor": "Snowflake"})
+    assert resp.status_code == 404
+
+
+def test_add_desk_vendor_duplicate_400(client, monkeypatch):
+    import tech_desk.api.main as main_module
+
+    def fake_add(desk_id, vendor):
+        raise ValueError("already tracked")
+
+    monkeypatch.setattr(main_module, "add_vendor_to_desk", fake_add)
+    resp = client.post("/api/desks/applications/vendors", json={"vendor": "Snowflake"})
+    assert resp.status_code == 400
+
+
+def test_add_desk_vendor_requires_name(client):
+    resp = client.post("/api/desks/applications/vendors", json={"vendor": ""})
+    assert resp.status_code == 422
+
+
 def test_download_unknown_format_400(client):
     # Report 999999 doesn't exist -> 404 before format check
     resp = client.get("/api/reports/999999/download/pdf")

@@ -17,21 +17,25 @@ logger = logging.getLogger(__name__)
 ANALYSIS_SYSTEM_PROMPT = """You are a senior technology analyst at Cotiviti, a healthcare technology and analytics company.
 Evaluate Gen AI news for relevance to enterprise stakeholders. Be selective and concise.
 
-For each search result, determine relevance, primary vendor, and a tight summary.
-Only mark relevant if it represents meaningful vendor developments: product launches, partnerships,
-funding, research, regulations, or major vendor moves.
+Judge relevance against the desk's focus areas below — NOT against any vendor list. This
+desk's "tracked vendors" are just vendors already being watched; they are not an allow-list.
+Genuinely new or emerging vendors, startups, and market entrants relevant to the focus areas
+are just as relevant as tracked ones, and should be surfaced under their own vendor name so
+they can be picked up for tracking too. Only mark relevant if it represents meaningful vendor
+developments: product launches, partnerships, funding, research, regulations, or major vendor moves.
 
 Respond in JSON:
 {
   "relevant": true/false,
   "title": "refined title (max 12 words)",
-  "summary": "1 sentence summary — direct and factual",
+  "summary": "1 sentence summary — direct and factual (the WHAT/description)",
   "vendor": "primary vendor name or Other",
   "category": "product_launch|partnership|funding|research|regulation|event|trend|vendor_move|other",
   "relevance": "high|medium|low",
   "tags": ["tag1"],
   "key_takeaways": ["one short takeaway"],
-  "stakeholder_impact": "one sentence on why Cotiviti leadership should care",
+  "stakeholder_impact": "one sentence on WHY this matters to Cotiviti leadership",
+  "who_is_affected_first": "short phrase naming the Cotiviti team/function/client segment affected first (e.g. 'Payment integrity analysts', 'HCLS clients on legacy EHR integrations')",
   "published_date": "YYYY-MM-DD or null if unknown"
 }"""
 
@@ -40,7 +44,14 @@ class UpdateAnalyzer:
     def __init__(self, llm: LLMClient):
         self.llm = llm
 
-    def analyze_result(self, desk: TechDeskDefinition, result: ResearchResult) -> CuratedUpdate | None:
+    def analyze_result(
+        self,
+        desk: TechDeskDefinition,
+        result: ResearchResult,
+        *,
+        vendor_notes: str = "",
+        custom_instructions: str = "",
+    ) -> CuratedUpdate | None:
         areas_text = ", ".join(desk.areas)
         sub_areas_text = ""
         if desk.sub_areas:
@@ -49,12 +60,14 @@ class UpdateAnalyzer:
 
         vendors_text = ", ".join(desk.key_vendors) if desk.key_vendors else "N/A"
         hint_vendor = result.target_vendor or "unknown"
+        notes_block = f"\nAnalyst notes on {hint_vendor} (context only, not a relevance filter):\n{vendor_notes}\n" if vendor_notes else ""
+        instructions_block = f"\nAdditional guidance for this run: {custom_instructions}\n" if custom_instructions else ""
         user_prompt = f"""Tech Desk: {desk.name} ({desk.code})
 Description: {desk.description}
 Focus areas: {areas_text}{sub_areas_text}
-Tracked vendors: {vendors_text}
+Vendors already tracked on this desk (for reference only — not exhaustive, not a filter): {vendors_text}
 Search target vendor (if any): {hint_vendor}
-
+{notes_block}{instructions_block}
 Evaluate this search result:
 Title: {result.title}
 URL: {result.url}
@@ -109,6 +122,7 @@ Snippet: {result.snippet}
             tags=data.get("tags", []),
             key_takeaways=data.get("key_takeaways", [])[:1],
             stakeholder_impact=data.get("stakeholder_impact", ""),
+            who_is_affected_first=data.get("who_is_affected_first", ""),
             raw_snippet=result.snippet,
             image_url=result.image_url or "",
         )

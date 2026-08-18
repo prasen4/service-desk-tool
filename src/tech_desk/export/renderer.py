@@ -21,6 +21,32 @@ class ReportRenderer:
             autoescape=select_autoescape(["html", "xml"]),
         )
 
+    @staticmethod
+    def _format_update_markdown(u, *, heading: str = "####") -> list[str]:
+        """Title -> Key Highlights -> Gist (What / Why it matters / Who's
+        affected first) -> Link. Shared by plain desk updates and vendor-intel
+        update bullets so both report sections use the same structure."""
+        date_str = (u.published_date or u.discovered_at).strftime("%Y-%m-%d")
+        lines: list[str] = []
+        if u.image_url:
+            lines.append(f"![{u.title}]({u.image_url})")
+        lines.append(f"{heading} {u.title}")
+        lines.append(f"*{date_str} · {u.source_name or 'Source'}*")
+        lines.append("")
+        if u.key_takeaways:
+            lines.append("**Key highlights**")
+            for t in u.key_takeaways:
+                lines.append(f"- {t}")
+            lines.append("")
+        lines.append(f"**What:** {u.summary}")
+        if u.stakeholder_impact:
+            lines.append(f"**Why it matters:** {u.stakeholder_impact}")
+        if getattr(u, "who_is_affected_first", ""):
+            lines.append(f"**Who's affected first:** {u.who_is_affected_first}")
+        lines.append(f"[Read more]({u.source_url})")
+        lines.append("")
+        return lines
+
     def render_all(self, report: GeneratedReport) -> dict[str, Path]:
         stamp = report.generated_at.strftime("%Y%m%d_%H%M%S")
         desk_suffix = ""
@@ -100,26 +126,13 @@ class ReportRenderer:
                         lines.append("")
                     if vs.updates:
                         for u in vs.updates:
-                            date_str = (u.published_date or u.discovered_at).strftime("%Y-%m-%d")
-                            img_md = f"![thumb]({u.image_url}) " if u.image_url else ""
-                            lines.append(
-                                f"- {img_md}[{u.title}]({u.source_url}) — {date_str} — {u.summary}"
-                            )
-                        lines.append("")
+                            lines.extend(self._format_update_markdown(u, heading="#####"))
                     if vs.cotiviti_relevance and not compact:
                         lines.extend([f"**Cotiviti:** {vs.cotiviti_relevance}", ""])
 
             elif section.updates:
                 for u in section.updates:
-                    date_str = (u.published_date or u.discovered_at).strftime("%Y-%m-%d")
-                    if u.image_url:
-                        lines.append(f"![{u.title}]({u.image_url})")
-                    lines.extend([
-                        f"#### {u.title}",
-                        f"- {date_str} · [{u.source_name or 'Source'}]({u.source_url})",
-                        f"- {u.summary}",
-                        "",
-                    ])
+                    lines.extend(self._format_update_markdown(u))
 
             if section.trend_analysis:
                 lines.extend(["### Trend Analysis", "", section.trend_analysis, ""])

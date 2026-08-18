@@ -52,6 +52,7 @@ class LLMClient:
         base_url: str | None = None,
         model: str | None = None,
         provider: str | None = None,
+        api_version: str | None = None,
     ):
         settings = get_settings()
         self.model = model or settings.openai_model
@@ -70,6 +71,18 @@ class LLMClient:
 
             self._client = Anthropic(
                 api_key=key,
+                timeout=60.0,
+                max_retries=2,
+                http_client=self._http_client,
+            )
+        elif self.sdk == "azure_openai":
+            from openai import AzureOpenAI
+
+            self.api_version = (api_version or settings.azure_openai_api_version or "2024-10-21").strip()
+            self._client = AzureOpenAI(
+                api_key=key,
+                azure_endpoint=resolved_base.rstrip("/"),
+                api_version=self.api_version,
                 timeout=60.0,
                 max_retries=2,
                 http_client=self._http_client,

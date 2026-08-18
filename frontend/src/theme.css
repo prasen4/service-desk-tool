@@ -1,0 +1,168 @@
+/* ============================================================
+   Cotiviti UI/UX Standards v1 — Tech Desk
+   Sleek, premium, calm — like a spa in Switzerland.
+   - Deep Purple always leads.
+   - Nunito Sans always. Body 17px. 14px floor.
+   - Spacing: multiples of 4 only.
+   - Never raw black or white — pull from palette scales.
+   - Whitespace is a feature. Caps eyebrows used sparingly.
+   ============================================================ */
+
+:root {
+  /* —— Palette: Deep Purple (primary) —— */
+  --deep-purple: #31006F;
+  --deep-purple-92: #390A75;
+  --deep-purple-84: #4A1F80;
+  --deep-purple-76: #5A338C;
+  --deep-purple-64: #73529D;
+  --deep-purple-48: #9C85BA;
+  --deep-purple-24: #C5B8D7;
+  --deep-purple-16: #DED6E8;
+  --deep-purple-8: #E6E0EE;
+  --deep-purple-4: #F7F5F9;
+
+  /* —— Palette: Soothing Violet (secondary / dark-mode brand) —— */
+  --soothing-violet: #7C61BA;
+  --soothing-violet-64: #A694D0;
+  --soothing-violet-24: #DAD3EC;
+  --soothing-violet-16: #EAE6F4;
+  --soothing-violet-8: #F5F2F9;
+
+  /* —— Palette: Lively Pink (accent — sparingly) —— */
+  --lively-pink: #D80F88;
+  --lively-pink-16: #F9D8EB;
+  --lively-pink-8: #FCECF5;
+
+  /* —— Palette: Galaxy Purple (neutral base / text) —— */
+  --galaxy-purple: #241E32;
+  --galaxy-purple-80: #504B5B;
+  --galaxy-purple-72: #595463;
+  --galaxy-purple-60: #7C7884;
+  --galaxy-purple-40: #A7A5AD;
+  --galaxy-purple-20: #D3D2D6;
+  --galaxy-purple-12: #E5E4E6;
+  --galaxy-purple-8: #EDEDEF;
+  --galaxy-purple-4: #F6F6F7;
+
+  /* —— Warm palettes (charts / status) —— */
+  --burnt-orange: #B55A06;
+  --burnt-orange-16: #F3E5D7;
+  --summer-rose: #990B60;
+  --evening-garnet: #47052D;
+  --autumn-bark: #663303;
+
+  /* —— Semantic tokens (light mode) —— */
+  --color-primary: var(--deep-purple);
+  --color-primary-hover: var(--deep-purple-92);
+  --color-secondary: var(--soothing-violet);
+  --color-accent: var(--lively-pink);
+
+  --color-bg: var(--soothing-violet-8);        /* calm violet-tinted base — not white */
+  --color-surface: #FDFCFE;                     /* raised panels — tinted, never #fff */
+  --color-surface-raised: #FDFCFE;
+  --color-surface-sunken: var(--deep-purple-4);
+
+  --color-text: var(--galaxy-purple);           /* dark shade — never raw black */
+  --color-muted: var(--galaxy-purple-60);
+  --color-border: var(--galaxy-purple-12);
+  --color-border-strong: var(--galaxy-purple-20);
+
+  --color-link: var(--soothing-violet);
+  --color-link-bg: var(--soothing-violet-16);
+
+  --color-success: #1B5E20;
+  --color-success-bg: #E8F5E9;
+  --color-warning: var(--burnt-orange);
+  --color-warning-bg: var(--burnt-orange-16);
+  --color-danger: var(--evening-garnet);
+  --color-danger-bg: #F8F5F7;
+
+  --color-focus-ring: rgba(49, 0, 111, 0.18);   /* primary @ 18% — calm, non-jarring */
+
+  /* —— Compatibility aliases (map to semantic tokens) —— */
+  --purple: var(--color-primary);
+  --purple-dark: var(--color-primary-hover);
+  --purple-light: var(--deep-purple-8);
+  --bg: var(--color-bg);
+  --surface: var(--color-surface);
+  --card: var(--color-surface);
+  --text: var(--color-text);
+  --muted: var(--color-muted);
+  --border: var(--color-border);
+  --link: var(--color-link);
+  --link-bg: var(--color-link-bg);
+  --success: var(--color-success);
+  --success-bg: var(--color-success-bg);
+  --warning: var(--color-warning);
+  --warning-bg: var(--color-warning-bg);
+  --danger: var(--color-danger);
+  --danger-bg: var(--color-danger-bg);
+
+  /* —— Spacing scale (4px grid — nothing off-grid) —— */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* —— Typography —— */
+  --font: "Nunito Sans", system-ui, -apple-system, sans-serif;
+
+  --text-body: 17px;      /* Body · 17/1.55 · 400 */
+  --text-small: 14px;     /* Small · 14/1.5 · 400 (floor) */
+  --leading-body: 1.55;
+  --leading-small: 1.5;
+
+  /* Type scale — meaningfully distinct, never clustered */
+  --h1-size: 56px;  --h1-line: 1.05;  --h1-weight: 800;
+  --h2-size: 40px;  --h2-line: 1.1;   --h2-weight: 800;
+  --h3-size: 28px;  --h3-line: 1.15;  --h3-weight: 700;
+  --h4-size: 22px;  --h4-line: 1.2;   --h4-weight: 700;
+  --h5-size: 18px;  --h5-line: 1.3;   --h5-weight: 700;
+  --h6-size: 15px;  --h6-line: 1.4;   --h6-weight: 700;  /* eyebrow · caps · sparingly */
+
+  /* Weights */
+  --weight-light: 300;    /* display only */
+  --weight-body: 400;
+  --weight-label: 600;    /* labels & nav */
+  --weight-bold: 700;     /* buttons, headings */
+  --weight-display: 800;  /* display headings */
+
+  /* —— Radius & elevation —— */
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+  --shadow: 0 1px 2px rgba(36, 30, 50, 0.04), 0 4px 14px rgba(36, 30, 50, 0.05);
+  --shadow-lg: 0 12px 32px rgba(36, 30, 50, 0.10);
+}
+
+/* —— Dark mode: a well-lit office at night ——
+   Toggled explicitly via [data-theme="dark"]; defaults to light. */
+[data-theme="dark"] {
+  /* In dark mode, Soothing Violet leads (Deep Purple fails contrast). */
+  --color-primary: var(--soothing-violet);
+  --color-primary-hover: var(--soothing-violet-64);
+  --color-link: var(--soothing-violet-64);
+  --color-link-bg: rgba(124, 97, 186, 0.22);
+
+  --color-bg: #323238;              /* dark grey — never pitch black */
+  --color-surface: #3E394B;         /* panels sit softly on the base */
+  --color-surface-raised: #3E394B;
+  --color-surface-sunken: #2D273A;
+
+  --color-text: var(--galaxy-purple-4);
+  --color-muted: var(--galaxy-purple-40);
+  --color-border: #504B5B;
+  --color-border-strong: #59546B;
+
+  --color-danger: #E6E0EE;
+  --color-danger-bg: rgba(151, 11, 96, 0.22);
+
+  --color-focus-ring: rgba(124, 97, 186, 0.35);
+}
+
+/* Smooth, calm transition when switching modes */
+body { transition: background-color 0.25s ease, color 0.25s ease; }

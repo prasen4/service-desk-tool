@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from tech_desk.config import list_desk_definitions
@@ -63,9 +64,26 @@ def serialize_update(orm: UpdateORM, desk_map: dict[str, dict]) -> dict:
     }
 
 
-def list_vendor_summaries(session: Session) -> list[dict]:
+def list_vendor_summaries(session: Session, *, limit: int | None = None, offset: int = 0) -> dict:
+    """Vendor news-feed summaries, aggregated at the SQL level.
+
+    Previously this loaded every ``updates`` row into Python just to group by
+    vendor — fine at hundreds of rows, a real memory/latency problem once the
+    table grows into the tens of thousands. Instead we let the database do the
+    GROUP BY (cheap, indexed on ``vendor``) and only bring back one row per
+    distinct raw vendor string, then merge aliases in Python over that much
+    smaller set.
+    """
     registry = build_vendor_registry()
     tracked_names = list(registry.keys())
+
+    sort_expr = func.coalesce(UpdateORM.published_date, UpdateORM.discovered_at)
+    rows = (
+        session.query(UpdateORM.vendor, func.count(UpdateORM.id), func.max(sort_expr))
+        .filter(UpdateORM.vendor != "")
+        .group_by(UpdateORM.vendor)
+        .all()
+    )
 
     summaries: dict[str, dict] = {
         name: {
@@ -78,37 +96,46 @@ def list_vendor_summaries(session: Session) -> list[dict]:
         for name, data in registry.items()
     }
 
-    updates = session.query(UpdateORM).order_by(UpdateORM.discovered_at.desc()).all()
-    for orm in updates:
-        canon = resolve_canonical_vendor(orm.vendor, tracked_names) or (orm.vendor.strip() if orm.vendor else "Other")
+    for raw_vendor, count, latest in rows:
+        canon = resolve_canonical_vendor(raw_vendor, tracked_names) or raw_vendor.strip()
         if canon not in summaries:
             summaries[canon] = {
                 "name": canon,
-                "is_tracked": False,
-                "tracked_desks": [],
+                "is_tracked": canon in registry,
+                "tracked_desks": registry.get(canon, {}).get("tracked_desks", []),
                 "update_count": 0,
                 "latest_at": None,
             }
         entry = summaries[canon]
-        entry["update_count"] += 1
-        sort_at = _update_sort_date(orm)
-        latest = entry["latest_at"]
-        if latest is None or sort_at > datetime.fromisoformat(latest):
-            entry["latest_at"] = sort_at.isoformat()
+        entry["update_count"] += count
+        if latest is not None and (entry["latest_at"] is None or latest > entry["latest_at"]):
+            entry["latest_at"] = latest
 
     result = list(summaries.values())
     result.sort(
         key=lambda v: (
             v["latest_at"] is None,
-            -(datetime.fromisoformat(v["latest_at"]).timestamp() if v["latest_at"] else 0),
+            -(v["latest_at"].timestamp() if v["latest_at"] else 0),
             -v["update_count"],
             v["name"].lower(),
         )
     )
-    return result
+    for entry in result:
+        entry["latest_at"] = entry["latest_at"].isoformat() if entry["latest_at"] else None
+
+    total = len(result)
+    if limit is not None:
+        result = result[offset : offset + limit]
+    return {"vendors": result, "total": total}
 
 
-def get_vendor_updates(session: Session, vendor_name: str, *, limit: int = 100) -> dict | None:
+def get_vendor_updates(
+    session: Session,
+    vendor_name: str,
+    *,
+    limit: int = 100,
+    offset: int = 0,
+) -> dict | None:
     registry = build_vendor_registry()
     tracked_names = list(registry.keys())
     desk_map = desk_lookup()
@@ -119,9 +146,22 @@ def get_vendor_updates(session: Session, vendor_name: str, *, limit: int = 100) 
         if matched:
             canonical = matched
 
-    updates = session.query(UpdateORM).all()
+    # SQL-level prefilter: narrows the scan to rows whose raw vendor string
+    # plausibly matches, instead of pulling the entire updates table into
+    # Python. The precise (fuzzy) canonicalization still runs afterward on
+    # this much smaller candidate set.
+    candidates = (
+        session.query(UpdateORM)
+        .filter(UpdateORM.vendor.ilike(f"%{canonical}%"))
+        .all()
+    )
+    if not candidates:
+        # Fall back to an exact (case-insensitive) match in case the fuzzy
+        # substring filter above missed a differently-worded alias.
+        candidates = session.query(UpdateORM).filter(func.lower(UpdateORM.vendor) == vendor_name.lower()).all()
+
     matched_updates: list[UpdateORM] = []
-    for orm in updates:
+    for orm in candidates:
         raw = orm.vendor or ""
         canon = resolve_canonical_vendor(raw, tracked_names) or (raw.strip() if raw else "Other")
         if canon.lower() == canonical.lower() or raw.lower() == vendor_name.lower():
@@ -131,7 +171,8 @@ def get_vendor_updates(session: Session, vendor_name: str, *, limit: int = 100) 
         return None
 
     matched_updates.sort(key=_update_sort_date, reverse=True)
-    limited = matched_updates[:limit]
+    total = len(matched_updates)
+    limited = matched_updates[offset : offset + limit]
 
     meta = registry.get(canonical, {
         "name": canonical,
@@ -143,6 +184,6 @@ def get_vendor_updates(session: Session, vendor_name: str, *, limit: int = 100) 
         "vendor": canonical,
         "is_tracked": meta.get("is_tracked", False),
         "tracked_desks": meta.get("tracked_desks", []),
-        "update_count": len(matched_updates),
+        "update_count": total,
         "updates": [serialize_update(u, desk_map) for u in limited],
     }

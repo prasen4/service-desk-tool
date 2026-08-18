@@ -12,13 +12,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from tech_desk import __version__
 from tech_desk.api.jobs import job_manager
+from tech_desk.api.rate_limit import configure_limiter, pipeline_limiter, rate_limit
 from tech_desk.api.services import run_pipeline_job, run_report_job, run_research_job
-from tech_desk.config import ReportPeriod, get_settings, load_desk_config, resolve_desks
+from tech_desk.api.vendor_routes import router as vendor_router
+from tech_desk.config import ReportPeriod, add_vendor_to_desk, get_settings, load_desk_config, resolve_desks
 from tech_desk.database import (
     AppConfigORM,
     ReportORM,
@@ -46,7 +48,9 @@ from tech_desk.vendors import (
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+WEB_DIST_DIR = Path(__file__).resolve().parent / "web" / "dist"
 _scheduler: TechDeskScheduler | None = None
+
 
 
 class ConfigureRequest(BaseModel):
@@ -54,6 +58,7 @@ class ConfigureRequest(BaseModel):
     provider: str | None = None
     base_url: str | None = None
     model: str | None = None
+    api_version: str | None = None
     skip_validation: bool = False
 
 
@@ -69,18 +74,21 @@ class RunResearchRequest(BaseModel):
     period: ReportPeriod = "daily"
     desk_ids: list[str] | None = Field(default=None)
     async_mode: bool = Field(default=True, description="Run in background and return job_id")
+    custom_instructions: str | None = Field(default=None, max_length=2000)
 
 
 class GenerateReportRequest(BaseModel):
     period: ReportPeriod = "monthly"
     desk_ids: list[str] | None = Field(default=None)
     async_mode: bool = Field(default=True)
+    custom_instructions: str | None = Field(default=None, max_length=2000)
 
 
 class FullPipelineRequest(BaseModel):
     period: ReportPeriod = "monthly"
     desk_ids: list[str] | None = Field(default=None)
     async_mode: bool = Field(default=True)
+    custom_instructions: str | None = Field(default=None, max_length=2000)
 
 
 def _require_api_key() -> None:
@@ -144,8 +152,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if STATIC_DIR.exists():
+if WEB_DIST_DIR.exists():
+    # Built React frontend takes priority once `npm run build` has been run
+    # (see frontend/README or Dockerfile for the build step).
+    assets_dir = WEB_DIST_DIR / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="frontend-assets")
+elif STATIC_DIR.exists():
+    # Legacy static dashboard — served until the frontend has been built.
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+app.include_router(vendor_router)
 
 
 @app.exception_handler(Exception)
@@ -169,9 +186,12 @@ async def request_logging(request: Request, call_next):
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
-    dashboard_path = STATIC_DIR / "index.html"
-    if dashboard_path.exists():
-        return HTMLResponse(dashboard_path.read_text(encoding="utf-8"))
+    index = WEB_DIST_DIR / "index.html"
+    if index.exists():
+        return HTMLResponse(index.read_text(encoding="utf-8"))
+    legacy = STATIC_DIR / "index.html"
+    if legacy.exists():
+        return HTMLResponse(legacy.read_text(encoding="utf-8"))
     return HTMLResponse("<h1>Cotiviti Tech Desk</h1><p>Visit /docs for API documentation.</p>")
 
 
@@ -241,6 +261,25 @@ async def list_desks():
     }
 
 
+class AddVendorRequest(BaseModel):
+    vendor: str = Field(..., min_length=1, max_length=128)
+
+
+@app.post("/api/desks/{desk_id}/vendors", dependencies=[Depends(rate_limit(configure_limiter, "add-vendor"))])
+async def add_desk_vendor(desk_id: str, req: AddVendorRequest):
+    """Add a vendor to a desk's tracked list — automatically picked up by
+    research (vendor-targeted search queries), Vendor News, and reports,
+    since none of those read a cached copy of the desk config.
+    """
+    try:
+        desk = add_vendor_to_desk(desk_id, req.vendor)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"desk": desk.model_dump()}
+
+
 @app.get("/api/models")
 async def list_models():
     """Provider + model catalog with pricing, plus current selection and desk count."""
@@ -253,6 +292,7 @@ async def list_models():
             "provider": settings.llm_provider,
             "model": settings.openai_model,
             "base_url": settings.openai_base_url,
+            "api_version": settings.azure_openai_api_version,
             "configured": bool(settings.openai_api_key),
         },
         "desk_count": desk_count,
@@ -279,7 +319,7 @@ async def cost_estimate(req: CostEstimateRequest):
     )
 
 
-@app.post("/api/configure")
+@app.post("/api/configure", dependencies=[Depends(rate_limit(configure_limiter, "configure"))])
 async def configure(req: ConfigureRequest, session: Session = Depends(get_db_session)):
     api_key = req.api_key.strip()
     model = (req.model or "gpt-4o").strip()
@@ -288,10 +328,14 @@ async def configure(req: ConfigureRequest, session: Session = Depends(get_db_ses
     if provider not in PROVIDERS:
         raise HTTPException(status_code=400, detail=f"Unknown provider '{provider}'.")
 
+    if provider == "azure_openai" and not (req.base_url or "").strip():
+        raise HTTPException(status_code=400, detail="Azure OpenAI requires your resource endpoint as the Base URL.")
+
     default_base = PROVIDERS[provider]["base_url"]
     base_url = (req.base_url or default_base or "https://api.openai.com/v1").strip().rstrip("/")
+    api_version = (req.api_version or "").strip() or get_settings().azure_openai_api_version
 
-    llm = LLMClient(api_key=api_key, base_url=base_url, model=model, provider=provider)
+    llm = LLMClient(api_key=api_key, base_url=base_url, model=model, provider=provider, api_version=api_version)
     try:
         if not req.skip_validation:
             result = llm.validate_api_key()
@@ -307,6 +351,7 @@ async def configure(req: ConfigureRequest, session: Session = Depends(get_db_ses
         "OPENAI_API_KEY": api_key,
         "OPENAI_BASE_URL": base_url,
         "OPENAI_MODEL": model,
+        "AZURE_OPENAI_API_VERSION": api_version,
     }
     existing_keys: set[str] = set()
     new_lines: list[str] = []
@@ -332,8 +377,9 @@ async def configure(req: ConfigureRequest, session: Session = Depends(get_db_ses
 
 
 @app.get("/api/jobs")
-async def list_jobs(limit: int = 20):
-    return {"jobs": [j.to_dict() for j in job_manager.list_recent(limit=min(limit, 50))]}
+async def list_jobs(limit: int = 20, offset: int = 0):
+    jobs = job_manager.list_recent(limit=min(limit, 50) + offset)[offset:]
+    return {"jobs": [j.to_dict() for j in jobs]}
 
 
 @app.get("/api/jobs/{job_id}")
@@ -344,7 +390,7 @@ async def get_job(job_id: str):
     return job.to_dict()
 
 
-@app.post("/api/research/run")
+@app.post("/api/research/run", dependencies=[Depends(rate_limit(pipeline_limiter, "research"))])
 async def run_research(req: RunResearchRequest):
     _require_api_key()
     desk_keys = _resolve_desk_keys(req.desk_ids)
@@ -355,16 +401,17 @@ async def run_research(req: RunResearchRequest):
             run_research_job,
             period=req.period,
             desk_keys=desk_keys,
+            custom_instructions=req.custom_instructions,
         )
         return {"job_id": job_id, "status": "pending"}
 
     try:
-        return run_research_job(period=req.period, desk_keys=desk_keys)
+        return run_research_job(period=req.period, desk_keys=desk_keys, custom_instructions=req.custom_instructions)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@app.post("/api/reports/generate")
+@app.post("/api/reports/generate", dependencies=[Depends(rate_limit(pipeline_limiter, "report"))])
 async def generate_report(req: GenerateReportRequest):
     _require_api_key()
     desk_keys = _resolve_desk_keys(req.desk_ids)
@@ -375,16 +422,17 @@ async def generate_report(req: GenerateReportRequest):
             run_report_job,
             period=req.period,
             desk_keys=desk_keys,
+            custom_instructions=req.custom_instructions,
         )
         return {"job_id": job_id, "status": "pending"}
 
     try:
-        return run_report_job(period=req.period, desk_keys=desk_keys)
+        return run_report_job(period=req.period, desk_keys=desk_keys, custom_instructions=req.custom_instructions)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@app.post("/api/pipeline/run")
+@app.post("/api/pipeline/run", dependencies=[Depends(rate_limit(pipeline_limiter, "pipeline"))])
 async def run_full_pipeline(req: FullPipelineRequest):
     _require_api_key()
     desk_keys = _resolve_desk_keys(req.desk_ids)
@@ -395,29 +443,31 @@ async def run_full_pipeline(req: FullPipelineRequest):
             run_pipeline_job,
             period=req.period,
             desk_keys=desk_keys,
+            custom_instructions=req.custom_instructions,
         )
         return {"job_id": job_id, "status": "pending"}
 
     try:
-        return run_pipeline_job(period=req.period, desk_keys=desk_keys)
+        return run_pipeline_job(period=req.period, desk_keys=desk_keys, custom_instructions=req.custom_instructions)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.get("/api/vendors")
-async def list_vendors(session: Session = Depends(get_db_session)):
+async def list_vendors(limit: int = 100, offset: int = 0, session: Session = Depends(get_db_session)):
     """All tracked vendors with update counts, sorted by latest activity."""
-    return {"vendors": list_vendor_summaries(session)}
+    return list_vendor_summaries(session, limit=min(limit, 500), offset=max(offset, 0))
 
 
 @app.get("/api/vendors/{vendor_name}/updates")
 async def vendor_updates(
     vendor_name: str,
     limit: int = 100,
+    offset: int = 0,
     session: Session = Depends(get_db_session),
 ):
     """Chronological news feed for a single vendor, tagged by tech desk."""
-    data = get_vendor_updates(session, vendor_name, limit=min(limit, 200))
+    data = get_vendor_updates(session, vendor_name, limit=min(limit, 200), offset=max(offset, 0))
     if data is None:
         raise HTTPException(status_code=404, detail=f"No updates found for vendor: {vendor_name}")
     return data
@@ -428,6 +478,7 @@ async def list_updates(
     desk_id: str | None = None,
     vendor: str | None = None,
     limit: int = 50,
+    offset: int = 0,
     session: Session = Depends(get_db_session),
 ):
     limit = min(limit, 200)
@@ -439,19 +490,33 @@ async def list_updates(
         tracked = list(build_vendor_registry().keys())
         canon = resolve_canonical_vendor(vendor, tracked) or vendor
         q = q.filter(UpdateORM.vendor.ilike(f"%{canon}%"))
-    rows = q.all()
-    rows.sort(
-        key=lambda u: u.published_date or u.discovered_at,
-        reverse=True,
-    )
-    updates = rows[:limit]
-    return {"updates": [serialize_update(u, desk_map) for u in updates]}
+
+    total = q.count()
+    sort_expr = func.coalesce(UpdateORM.published_date, UpdateORM.discovered_at)
+    updates = q.order_by(sort_expr.desc()).offset(max(offset, 0)).limit(limit).all()
+    return {"updates": [serialize_update(u, desk_map) for u in updates], "total": total}
 
 
 @app.get("/api/research/runs")
-async def list_research_runs(limit: int = 20, session: Session = Depends(get_db_session)):
-    runs = session.query(ResearchRunORM).order_by(ResearchRunORM.started_at.desc()).limit(min(limit, 100)).all()
+async def list_research_runs(limit: int = 20, offset: int = 0, session: Session = Depends(get_db_session)):
+    total = session.query(ResearchRunORM).count()
+    runs = (
+        session.query(ResearchRunORM)
+        .order_by(ResearchRunORM.started_at.desc())
+        .offset(max(offset, 0))
+        .limit(min(limit, 100))
+        .all()
+    )
+    def _vendors_added(metadata_json: str | None) -> list[str]:
+        if not metadata_json:
+            return []
+        try:
+            return json.loads(metadata_json).get("vendors_added", [])
+        except (json.JSONDecodeError, AttributeError):
+            return []
+
     return {
+        "total": total,
         "runs": [
             {
                 "id": r.id,
@@ -461,17 +526,26 @@ async def list_research_runs(limit: int = 20, session: Session = Depends(get_db_
                 "period": r.period,
                 "desks_processed": r.desks_processed,
                 "updates_found": r.updates_found,
+                "vendors_added": _vendors_added(r.metadata_json),
                 "error_message": r.error_message,
             }
             for r in runs
-        ]
+        ],
     }
 
 
 @app.get("/api/reports")
-async def list_reports(limit: int = 20, session: Session = Depends(get_db_session)):
-    reports = session.query(ReportORM).order_by(ReportORM.generated_at.desc()).limit(min(limit, 100)).all()
+async def list_reports(limit: int = 20, offset: int = 0, session: Session = Depends(get_db_session)):
+    total = session.query(ReportORM).count()
+    reports = (
+        session.query(ReportORM)
+        .order_by(ReportORM.generated_at.desc())
+        .offset(max(offset, 0))
+        .limit(min(limit, 100))
+        .all()
+    )
     return {
+        "total": total,
         "reports": [
             {
                 "id": r.id,
@@ -484,7 +558,7 @@ async def list_reports(limit: int = 20, session: Session = Depends(get_db_sessio
                 "has_pdf": bool(r.pdf_path),
             }
             for r in reports
-        ]
+        ],
     }
 
 
@@ -539,3 +613,22 @@ async def download_report(report_id: int, fmt: str, session: Session = Depends(g
 
 def create_app() -> FastAPI:
     return app
+
+
+# —— SPA fallback ——
+# Must be registered last: any path not already matched by an API route or a
+# mounted static/asset directory falls back to the built frontend's
+# index.html so React Router can handle client-side routes on full page loads
+# (e.g. a browser refresh on /vendors/Acme).
+_SPA_EXCLUDED_PREFIXES = ("api/", "assets/", "static/")
+_SPA_EXCLUDED_EXACT = {"docs", "redoc", "openapi.json"}
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def spa_fallback(full_path: str):
+    if full_path in _SPA_EXCLUDED_EXACT or full_path.startswith(_SPA_EXCLUDED_PREFIXES):
+        raise HTTPException(status_code=404, detail="Not found")
+    index = WEB_DIST_DIR / "index.html"
+    if index.exists():
+        return HTMLResponse(index.read_text(encoding="utf-8"))
+    raise HTTPException(status_code=404, detail="Not found")

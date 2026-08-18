@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
+from pathlib import Path
 
 from sqlalchemy import (
     DateTime,
@@ -15,8 +17,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 from tech_desk.config import get_settings
-from tech_desk.models import RelevanceLevel, ResearchRunResult, UpdateCategory
+from tech_desk.models import PositionPaperResult, RelevanceLevel, ResearchRunResult, UpdateCategory, VendorStatus
 from tech_desk.timeutils import now_utc
+
+logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -35,6 +39,7 @@ class ResearchRunORM(Base):
     updates_found: Mapped[int] = mapped_column(Integer, default=0)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    custom_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     updates: Mapped[list["UpdateORM"]] = relationship(back_populates="research_run")
 
@@ -56,6 +61,7 @@ class UpdateORM(Base):
     tags_json: Mapped[str] = mapped_column(Text, default="[]")
     key_takeaways_json: Mapped[str] = mapped_column(Text, default="[]")
     stakeholder_impact: Mapped[str] = mapped_column(Text, default="")
+    who_is_affected_first: Mapped[str] = mapped_column(String(256), default="")
     raw_snippet: Mapped[str] = mapped_column(Text, default="")
     vendor: Mapped[str] = mapped_column(String(128), default="", index=True)
     image_url: Mapped[str] = mapped_column(String(2048), default="")
@@ -78,6 +84,7 @@ class ReportORM(Base):
     html_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     markdown_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     pdf_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    custom_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class AppConfigORM(Base):
@@ -86,6 +93,111 @@ class AppConfigORM(Base):
     key: Mapped[str] = mapped_column(String(128), primary_key=True)
     value: Mapped[str] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, onupdate=now_utc)
+
+
+class VendorORM(Base):
+    """Canonical vendor CRM profile — relationship pipeline, notes, and attachments."""
+
+    __tablename__ = "vendors"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(32), default=VendorStatus.IDENTIFIED.value)
+    owner: Mapped[str] = mapped_column(String(128), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, onupdate=now_utc)
+
+    notes: Mapped[list["VendorNoteORM"]] = relationship(
+        back_populates="vendor", cascade="all, delete-orphan", order_by="VendorNoteORM.created_at.desc()"
+    )
+    status_events: Mapped[list["VendorStatusEventORM"]] = relationship(
+        back_populates="vendor", cascade="all, delete-orphan", order_by="VendorStatusEventORM.created_at.desc()"
+    )
+    attachments: Mapped[list["VendorAttachmentORM"]] = relationship(
+        back_populates="vendor", cascade="all, delete-orphan", order_by="VendorAttachmentORM.uploaded_at.desc()"
+    )
+
+
+class VendorNoteORM(Base):
+    """Analyst-authored note on a vendor (plaintext/markdown)."""
+
+    __tablename__ = "vendor_notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    vendor_id: Mapped[int] = mapped_column(ForeignKey("vendors.id", ondelete="CASCADE"), index=True)
+    body: Mapped[str] = mapped_column(Text)
+    author: Mapped[str] = mapped_column(String(128), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, index=True)
+
+    vendor: Mapped["VendorORM"] = relationship(back_populates="notes")
+    attachments: Mapped[list["VendorAttachmentORM"]] = relationship(back_populates="note")
+
+
+class VendorAttachmentORM(Base):
+    """A file uploaded alongside a vendor note (pitch deck, POC results, etc.)."""
+
+    __tablename__ = "vendor_attachments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    vendor_id: Mapped[int] = mapped_column(ForeignKey("vendors.id", ondelete="CASCADE"), index=True)
+    note_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vendor_notes.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    original_filename: Mapped[str] = mapped_column(String(256))
+    stored_filename: Mapped[str] = mapped_column(String(256))
+    content_type: Mapped[str] = mapped_column(String(128), default="application/octet-stream")
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, index=True)
+
+    vendor: Mapped["VendorORM"] = relationship(back_populates="attachments")
+    note: Mapped["VendorNoteORM | None"] = relationship(back_populates="attachments")
+
+
+class VendorStatusEventORM(Base):
+    """A timestamped transition in a vendor's pipeline stage."""
+
+    __tablename__ = "vendor_status_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    vendor_id: Mapped[int] = mapped_column(ForeignKey("vendors.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(32))
+    note: Mapped[str] = mapped_column(Text, default="")
+    changed_by: Mapped[str] = mapped_column(String(128), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, index=True)
+
+    vendor: Mapped["VendorORM"] = relationship(back_populates="status_events")
+
+
+class PositionPaperORM(Base):
+    """A generated per-vendor Cotiviti Position Paper (.docx) — durable record."""
+
+    __tablename__ = "position_papers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    vendor: Mapped[str] = mapped_column(String(128), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="running")
+    custom_prompt: Mapped[str] = mapped_column(Text, default="")
+    research_brief_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    docx_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, index=True)
+    generated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class JobORM(Base):
+    """Durable record of a background job — survives process restarts."""
+
+    __tablename__ = "jobs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    job_type: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    message: Mapped[str] = mapped_column(String(512), default="Queued")
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, index=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 _engine = None
@@ -153,28 +265,41 @@ def get_session_factory():
     return _SessionLocal
 
 
+def _migrations_dir() -> Path:
+    return Path(__file__).resolve().parent / "migrations"
+
+
+def _alembic_config():
+    from alembic.config import Config
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(_migrations_dir()))
+    return cfg
+
+
 def init_db() -> None:
+    """Create/upgrade the schema via Alembic migrations.
+
+    Fresh databases run every migration from scratch. Databases created by an
+    older release (before Alembic was introduced, via ``Base.metadata.create_all``)
+    are detected and stamped to the baseline revision so only the *new*
+    migrations run against them — no data loss, no duplicate-table errors.
+    """
+    from alembic import command
+    from sqlalchemy import inspect
+
     engine = get_engine()
-    Base.metadata.create_all(bind=engine)
-    _migrate_schema(engine)
-
-
-def _migrate_schema(engine) -> None:
-    """Add columns introduced after initial release (SQLite-safe)."""
-    from sqlalchemy import inspect, text
-
     inspector = inspect(engine)
-    if "updates" not in inspector.get_table_names():
-        return
-    columns = {col["name"] for col in inspector.get_columns("updates")}
-    migrations: list[tuple[str, str]] = [
-        ("vendor", "ALTER TABLE updates ADD COLUMN vendor VARCHAR(128) DEFAULT ''"),
-        ("image_url", "ALTER TABLE updates ADD COLUMN image_url VARCHAR(2048) DEFAULT ''"),
-    ]
-    for col_name, ddl in migrations:
-        if col_name not in columns:
-            with engine.begin() as conn:
-                conn.execute(text(ddl))
+    existing_tables = set(inspector.get_table_names())
+    pre_alembic_install = bool(existing_tables) and "alembic_version" not in existing_tables
+
+    cfg = _alembic_config()
+    with engine.begin() as conn:
+        cfg.attributes["connection"] = conn
+        if pre_alembic_install:
+            logger.info("Existing pre-Alembic database detected — stamping baseline revision")
+            command.stamp(cfg, "0001_baseline")
+        command.upgrade(cfg, "head")
 
 
 def get_db_session():
@@ -264,13 +389,33 @@ def all_token_samples() -> dict:
 
 def research_run_from_orm(orm: ResearchRunORM) -> ResearchRunResult:
     """Copy ORM fields into a plain object while the session is still open."""
+    vendors_added: list[str] = []
+    if orm.metadata_json:
+        try:
+            vendors_added = json.loads(orm.metadata_json).get("vendors_added", [])
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            vendors_added = []
     return ResearchRunResult(
         id=orm.id,
         status=orm.status,
         period=orm.period,
         desks_processed=orm.desks_processed,
         updates_found=orm.updates_found,
+        vendors_added=vendors_added,
         error_message=orm.error_message,
         started_at=orm.started_at,
         completed_at=orm.completed_at,
+    )
+
+
+def position_paper_from_orm(orm: PositionPaperORM) -> PositionPaperResult:
+    """Copy ORM fields into a plain object while the session is still open."""
+    return PositionPaperResult(
+        id=orm.id,
+        vendor=orm.vendor,
+        status=orm.status,
+        custom_prompt=orm.custom_prompt,
+        docx_path=orm.docx_path,
+        generated_at=orm.generated_at,
+        error_message=orm.error_message,
     )

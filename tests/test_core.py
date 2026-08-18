@@ -123,6 +123,81 @@ def test_collector_returns_detached_result():
     assert result.desks_processed == 1
 
 
+def test_collector_auto_tracks_new_vendor(monkeypatch):
+    """Research isn't limited to tracked vendors — newly discovered ones get auto-tracked."""
+    from unittest.mock import MagicMock
+
+    from tech_desk.config import list_desk_definitions
+    from tech_desk.database import init_db
+    from tech_desk.models import CuratedUpdate, ResearchResult
+    from tech_desk.research import collector as collector_module
+    from tech_desk.research.collector import ResearchCollector
+
+    init_db()
+    desk = next(d for d in list_desk_definitions() if d.id == "models")
+    assert "Snowflake" not in desk.key_vendors  # sanity: not already tracked
+
+    collector = ResearchCollector(llm=MagicMock())
+    collector.searcher.search_desk = MagicMock(
+        return_value=[ResearchResult(title="Snowflake launches AI copilot", url="https://example.com/snowflake")]
+    )
+    collector.analyzer.analyze_result = MagicMock(
+        return_value=CuratedUpdate(
+            desk_id="models",
+            title="Snowflake launches AI copilot",
+            summary="Snowflake shipped a new AI copilot for enterprise data teams.",
+            source_url="https://example.com/snowflake",
+            vendor="Snowflake",
+        )
+    )
+
+    added_calls = []
+    monkeypatch.setattr(collector_module, "add_vendor_to_desk", lambda desk_id, vendor: added_calls.append((desk_id, vendor)))
+
+    result = collector.run(period="daily", desk_keys=["M"])
+
+    assert added_calls == [("models", "Snowflake")]
+    assert result.vendors_added == ["Snowflake (M)"]
+    assert result.updates_found == 1
+
+
+def test_collector_skips_already_tracked_vendor(monkeypatch):
+    """Vendors already on the desk's tracked list should not trigger another add."""
+    from unittest.mock import MagicMock
+
+    from tech_desk.config import list_desk_definitions
+    from tech_desk.database import init_db
+    from tech_desk.models import CuratedUpdate, ResearchResult
+    from tech_desk.research import collector as collector_module
+    from tech_desk.research.collector import ResearchCollector
+
+    init_db()
+    desk = next(d for d in list_desk_definitions() if d.id == "models")
+    tracked_vendor = desk.key_vendors[0]
+
+    collector = ResearchCollector(llm=MagicMock())
+    collector.searcher.search_desk = MagicMock(
+        return_value=[ResearchResult(title="t", url="https://example.com/x")]
+    )
+    collector.analyzer.analyze_result = MagicMock(
+        return_value=CuratedUpdate(
+            desk_id="models",
+            title="t",
+            summary="s",
+            source_url="https://example.com/x",
+            vendor=tracked_vendor,
+        )
+    )
+
+    added_calls = []
+    monkeypatch.setattr(collector_module, "add_vendor_to_desk", lambda desk_id, vendor: added_calls.append((desk_id, vendor)))
+
+    result = collector.run(period="daily", desk_keys=["M"])
+
+    assert added_calls == []
+    assert result.vendors_added == []
+
+
 def test_pipeline_job_reads_research_after_session_close(monkeypatch):
     """Regression: pipeline must not crash accessing research stats after collector closes."""
     from datetime import datetime
@@ -197,7 +272,7 @@ def test_vendor_summaries_and_feed():
         ))
         session.commit()
 
-        summaries = list_vendor_summaries(session)
+        summaries = list_vendor_summaries(session)["vendors"]
         openai = next(v for v in summaries if v["name"] == "OpenAI")
         assert openai["update_count"] >= 2
         assert openai["latest_at"] is not None
