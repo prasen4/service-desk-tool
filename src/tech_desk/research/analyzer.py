@@ -14,8 +14,9 @@ from dateutil import parser as date_parser
 
 logger = logging.getLogger(__name__)
 
-ANALYSIS_SYSTEM_PROMPT = """You are a senior technology analyst at Cotiviti, a healthcare technology and analytics company.
-Evaluate Gen AI news for relevance to enterprise stakeholders. Be selective and concise.
+ANALYSIS_SYSTEM_PROMPT = """You are a senior technology analyst at Cotiviti, a healthcare technology and analytics company,
+producing a technical prospecting report — a curated feed of concrete vendor developments for
+enterprise stakeholders, not a general web digest. Be selective and concise.
 
 Judge relevance against the desk's focus areas below — NOT against any vendor list. This
 desk's "tracked vendors" are just vendors already being watched; they are not an allow-list.
@@ -24,9 +25,24 @@ are just as relevant as tracked ones, and should be surfaced under their own ven
 they can be picked up for tracking too. Only mark relevant if it represents meaningful vendor
 developments: product launches, partnerships, funding, research, regulations, or major vendor moves.
 
+STRICT quality bar — set "specific_event": false (even if otherwise topically relevant) for:
+- Generic "market trends", "industry forecast/report", or "X in <year>" pieces with no
+  specific vendor action tied to one real, dateable event.
+- SEO listicles / buyer's guides ("Top N tools", "Best X for Y", "How to choose a...") and
+  pricing/comparison round-ups written as evergreen marketing content rather than news of an
+  actual vendor price or plan CHANGE.
+- Vendor marketing/landing pages restating existing product capabilities with no new
+  announcement.
+- Opinion/analyst commentary with no concrete, attributable vendor action.
+Only set "specific_event": true for content describing one specific, attributable event: a
+launch, release, partnership, acquisition, funding round, executive/regulatory decision,
+outage/incident, or a concrete pricing/product change — something you could put a date on and
+name the actor(s) of.
+
 Respond in JSON:
 {
   "relevant": true/false,
+  "specific_event": true/false,
   "title": "refined title (max 12 words)",
   "summary": "1 sentence summary — direct and factual (the WHAT/description)",
   "vendor": "primary vendor name or Other",
@@ -85,6 +101,23 @@ Snippet: {result.snippet}
         if not data.get("relevant", False):
             return None
 
+        # Quality gate: reject generic/evergreen "trends", buyer's-guide, or
+        # marketing content even when the LLM judged it topically relevant —
+        # a technical prospecting report should only surface concrete,
+        # attributable vendor events. Default True (permissive) if the model
+        # omits the field, since "relevant" is still the primary gate.
+        if not data.get("specific_event", True):
+            logger.info(
+                "Discarding non-specific/evergreen result for %s: %s", desk.name, result.title
+            )
+            return None
+
+        title = (data.get("title") or result.title or "").strip()
+        summary = (data.get("summary") or "").strip()
+        if not title or not summary:
+            logger.info("Discarding incomplete analysis for %s (missing title/summary)", result.url)
+            return None
+
         category_str = data.get("category", "other")
         try:
             category = UpdateCategory(category_str)
@@ -111,8 +144,8 @@ Snippet: {result.snippet}
 
         return CuratedUpdate(
             desk_id=desk.id,
-            title=data.get("title", result.title),
-            summary=data.get("summary", result.snippet[:500]),
+            title=title,
+            summary=summary,
             source_url=result.url,
             source_name=result.source_domain,
             vendor=vendor,

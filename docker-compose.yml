@@ -1,4 +1,23 @@
 services:
+  # Self-hosted metasearch engine used by the research pipeline instead of
+  # (or alongside) DuckDuckGo — see src/tech_desk/research/search.py. Not
+  # gated behind a profile: it's cheap to run and the app falls back to DDG
+  # automatically if this is down or unreachable.
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    ports:
+      - "127.0.0.1:8888:8080"
+    volumes:
+      - ./deploy/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8888/
+    restart: unless-stopped
+    # Machines behind a corporate TLS-inspecting proxy (e.g. Zscaler) may need
+    # to trust an extra root CA for outbound HTTPS to upstream search engines
+    # to pass cert verification. See docker-compose.override.yml (gitignored,
+    # local-only) rather than adding that here — this file must work as-is
+    # on hosts with no such proxy (e.g. EC2).
+
   tech-desk:
     build: .
     # Bind to localhost only; put nginx (see deploy/nginx.conf) in front for TLS/auth.
@@ -11,6 +30,9 @@ services:
       # When the postgres profile is enabled, point the app at the db service.
       # Leave DATABASE_URL empty in .env to keep the SQLite fallback.
       DATABASE_URL: ${DATABASE_URL:-}
+      # Leave unset (or override in .env) to use SearXNG only in local Docker
+      # testing without touching the app's own env file.
+      SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
     volumes:
       - tech-desk-data:/data
       # Read-write: the app persists new vendors added to a desk back into

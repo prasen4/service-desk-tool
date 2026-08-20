@@ -1,0 +1,22 @@
+# Minimal SearXNG overrides for internal/private use by the tech-desk research
+# pipeline. Merged on top of SearXNG's baked-in defaults (use_default_settings),
+# so all standard engines stay enabled — this just turns on the JSON API and
+# disables the public-instance rate limiter (not needed for an internal
+# instance that's never exposed to the internet).
+use_default_settings: true
+
+general:
+  debug: false
+
+server:
+  # Not a real secret in the security sense — SearXNG just uses this to sign
+  # session cookies. Fine as a static value for a private, internal-only
+  # instance not exposed to the internet.
+  secret_key: "techdesk-searxng-internal-only"
+  limiter: false
+  image_proxy: false
+
+search:
+  formats:
+    - html
+    - json

@@ -3,6 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
+from datetime import timedelta
+from difflib import SequenceMatcher
 
 from sqlalchemy.orm import Session
 
@@ -18,9 +21,27 @@ from tech_desk.timeutils import now_utc
 
 logger = logging.getLogger(__name__)
 
+_NEAR_DUPLICATE_THRESHOLD = 0.82
+
 
 def _dedup_hash(desk_id: str, url: str) -> str:
     return hashlib.sha256(f"{desk_id}:{url}".encode()).hexdigest()
+
+
+def _normalize_title(title: str) -> str:
+    return re.sub(r"[^a-z0-9\s]", "", title.lower()).strip()
+
+
+def _is_near_duplicate_title(title: str, seen_normalized_titles: list[str]) -> bool:
+    """Multiple sources often cover the exact same underlying event with
+    slightly different headlines — a technical prospecting report shouldn't
+    repeat the same story. Fuzzy-match against titles already accepted for
+    this desk in this run and drop later near-duplicates."""
+    norm = _normalize_title(title)
+    for other in seen_normalized_titles:
+        if SequenceMatcher(None, norm, other).ratio() >= _NEAR_DUPLICATE_THRESHOLD:
+            return True
+    return False
 
 
 class ResearchCollector:
@@ -83,6 +104,7 @@ class ResearchCollector:
                 # so it's picked up by future research runs and report generation too.
                 tracked_lower = {v.lower() for v in desk.key_vendors}
                 newly_tracked_this_desk: set[str] = set()
+                seen_titles_this_desk: list[str] = []
 
                 for result_item in results:
                     vendor_notes = ""
@@ -99,6 +121,33 @@ class ResearchCollector:
                     )
                     if curated is None:
                         continue
+
+                    # Search engines (especially general-web SearXNG engines that
+                    # don't strictly honor the time_range filter) can surface old,
+                    # evergreen pages that are still topically relevant, which the
+                    # LLM has no reason to reject on relevance alone. Hard-filter on
+                    # the extracted publish date as a backstop against stale results
+                    # showing up in reports (e.g. a 2022 product launch page in 2026).
+                    if curated.published_date is not None:
+                        pub_date = curated.published_date
+                        if pub_date.tzinfo is not None:
+                            pub_date = pub_date.replace(tzinfo=None)
+                        cutoff = now_utc() - timedelta(days=self.settings.research_lookback_days)
+                        if pub_date < cutoff:
+                            logger.info(
+                                "Discarding stale result for %s: published %s is older than the %d-day lookback window",
+                                desk.name,
+                                pub_date.date(),
+                                self.settings.research_lookback_days,
+                            )
+                            continue
+
+                    if _is_near_duplicate_title(curated.title, seen_titles_this_desk):
+                        logger.info(
+                            "Discarding near-duplicate story for %s: %s", desk.name, curated.title
+                        )
+                        continue
+                    seen_titles_this_desk.append(_normalize_title(curated.title))
 
                     vendor_name = (curated.vendor or "").strip()
                     if (

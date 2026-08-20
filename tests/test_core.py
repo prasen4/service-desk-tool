@@ -198,6 +198,130 @@ def test_collector_skips_already_tracked_vendor(monkeypatch):
     assert result.vendors_added == []
 
 
+def test_analyzer_rejects_non_specific_event():
+    """Quality gate: generic/evergreen 'trends' or marketing content must be
+    rejected even if the LLM otherwise judged it topically relevant."""
+    from unittest.mock import MagicMock
+
+    from tech_desk.config import list_desk_definitions
+    from tech_desk.models import ResearchResult
+    from tech_desk.research.analyzer import UpdateAnalyzer
+
+    desk = next(d for d in list_desk_definitions() if d.id == "infrastructure")
+    llm = MagicMock()
+    llm.chat_json.return_value = {
+        "relevant": True,
+        "specific_event": False,
+        "title": "AI Infrastructure Trends and Statistics for 2026",
+        "summary": "A generic overview of AI infrastructure market trends.",
+        "vendor": "Other",
+        "relevance": "high",
+    }
+    analyzer = UpdateAnalyzer(llm)
+    result = ResearchResult(title="AI Infrastructure Trends and Statistics for 2026", url="https://example.com/trends")
+
+    curated = analyzer.analyze_result(desk, result)
+
+    assert curated is None
+
+
+def test_analyzer_rejects_incomplete_analysis():
+    """Quality gate: reject analyses missing a title or summary rather than
+    persist a low-quality/malformed update."""
+    from unittest.mock import MagicMock
+
+    from tech_desk.config import list_desk_definitions
+    from tech_desk.models import ResearchResult
+    from tech_desk.research.analyzer import UpdateAnalyzer
+
+    desk = next(d for d in list_desk_definitions() if d.id == "infrastructure")
+    llm = MagicMock()
+    llm.chat_json.return_value = {
+        "relevant": True,
+        "specific_event": True,
+        "title": "",
+        "summary": "",
+        "vendor": "CoreWeave",
+        "relevance": "high",
+    }
+    analyzer = UpdateAnalyzer(llm)
+    result = ResearchResult(title="", url="https://example.com/incomplete")
+
+    curated = analyzer.analyze_result(desk, result)
+
+    assert curated is None
+
+
+def test_analyzer_accepts_specific_event():
+    """Sanity check: a concrete, dateable vendor event still passes through."""
+    from unittest.mock import MagicMock
+
+    from tech_desk.config import list_desk_definitions
+    from tech_desk.models import ResearchResult
+    from tech_desk.research.analyzer import UpdateAnalyzer
+
+    desk = next(d for d in list_desk_definitions() if d.id == "infrastructure")
+    llm = MagicMock()
+    llm.chat_json.return_value = {
+        "relevant": True,
+        "specific_event": True,
+        "title": "CoreWeave Signs $11.9B Contract With OpenAI",
+        "summary": "CoreWeave expands its AI infrastructure partnership with OpenAI.",
+        "vendor": "CoreWeave",
+        "relevance": "high",
+        "stakeholder_impact": "Signals continued hyperscaler-scale demand for GPU capacity.",
+    }
+    analyzer = UpdateAnalyzer(llm)
+    result = ResearchResult(title="CoreWeave Signs Contract", url="https://example.com/coreweave")
+
+    curated = analyzer.analyze_result(desk, result)
+
+    assert curated is not None
+    assert curated.vendor == "CoreWeave"
+
+
+def test_collector_dedupes_near_duplicate_titles(monkeypatch):
+    """Multiple sources covering the same underlying event should only
+    surface once per run, even with slightly different headlines/URLs."""
+    from unittest.mock import MagicMock
+
+    from tech_desk.database import init_db
+    from tech_desk.models import CuratedUpdate, ResearchResult
+    from tech_desk.research import collector as collector_module
+    from tech_desk.research.collector import ResearchCollector
+
+    init_db()
+    collector = ResearchCollector(llm=MagicMock())
+    collector.searcher.search_desk = MagicMock(
+        return_value=[
+            ResearchResult(title="NTT DATA Opens Sydney Innovation Centre for AI", url="https://a.example.com/1"),
+            ResearchResult(title="NTT DATA opens new Sydney AI innovation centre", url="https://b.example.com/2"),
+        ]
+    )
+    updates = [
+        CuratedUpdate(
+            desk_id="models",
+            title="NTT DATA Opens Sydney Innovation Centre for AI",
+            summary="NTT DATA opened a new AI-focused innovation centre in Sydney.",
+            source_url="https://a.example.com/1",
+            vendor="NTT DATA",
+        ),
+        CuratedUpdate(
+            desk_id="models",
+            title="NTT DATA opens new Sydney AI innovation centre",
+            summary="NTT DATA opened a new AI-focused innovation centre in Sydney.",
+            source_url="https://b.example.com/2",
+            vendor="NTT DATA",
+        ),
+    ]
+    collector.analyzer.analyze_result = MagicMock(side_effect=updates)
+    monkeypatch.setattr(collector_module, "add_vendor_to_desk", lambda desk_id, vendor: None)
+
+    result = collector.run(period="daily", desk_keys=["M"])
+
+    assert result.updates_found == 1
+
+
 def test_pipeline_job_reads_research_after_session_close(monkeypatch):
     """Regression: pipeline must not crash accessing research stats after collector closes."""
     from datetime import datetime

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from tech_desk.models import TechDeskDefinition
@@ -54,6 +54,26 @@ class Settings(BaseSettings):
     research_max_results_per_query: int = Field(default=8, validation_alias="RESEARCH_MAX_RESULTS_PER_QUERY")
     research_lookback_days: int = Field(default=30, validation_alias="RESEARCH_LOOKBACK_DAYS")
     priority_desk_depth_multiplier: int = Field(default=2, validation_alias="PRIORITY_DESK_DEPTH_MULTIPLIER")
+
+    # Optional self-hosted SearXNG metasearch instance, tried before DuckDuckGo.
+    # DDG is used as a fallback if this isn't set or a query to it fails.
+    # e.g. http://localhost:8888 locally, http://searxng:8080 in docker-compose.
+    searxng_url: str | None = Field(default=None, validation_alias="SEARXNG_URL")
+
+    # Toggle which web search backend WebSearcher uses:
+    #   auto    (default) — prefer SearXNG (if SEARXNG_URL is set), fall back to DuckDuckGo
+    #   searxng — SearXNG only, no DuckDuckGo fallback (fails closed if unreachable/unconfigured)
+    #   ddg     — DuckDuckGo only, SearXNG is never queried even if SEARXNG_URL is set
+    search_backend: Literal["auto", "searxng", "ddg"] = Field(
+        default="auto", validation_alias="SEARCH_BACKEND"
+    )
+
+    @field_validator("search_backend", mode="before")
+    @classmethod
+    def _normalize_search_backend(cls, v):
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
 
     sharepoint_site_url: str | None = Field(default=None, validation_alias="SHAREPOINT_SITE_URL")
     sharepoint_client_id: str | None = Field(default=None, validation_alias="SHAREPOINT_CLIENT_ID")

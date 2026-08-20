@@ -226,6 +226,47 @@ def serve(
 
 
 @app.command()
+def doctor():
+    """Run deploy-readiness checks (DB, migrations, config, search backend).
+
+    Exits non-zero if any blocking check fails — use this after `deploy.sh`
+    restarts the service, or before pointing traffic at a new deployment.
+    """
+    init_db()
+    from tech_desk import diagnostics
+
+    result = diagnostics.run_all_checks()
+    checks = result["checks"]
+
+    table = Table(title="Tech Desk Doctor")
+    table.add_column("Check", style="cyan")
+    table.add_column("Result")
+    table.add_column("Details", overflow="fold")
+
+    blocking_failed = False
+    for name, check in checks.items():
+        ok = check.get("ok", False)
+        if name != "search_backend" and not ok:
+            blocking_failed = True
+        icon = "[green]OK[/green]" if ok else "[red]FAIL[/red]"
+        details_parts = []
+        for key, value in check.items():
+            if key == "ok":
+                continue
+            if value in (None, "", []):
+                continue
+            details_parts.append(f"{key}={value}")
+        table.add_row(name, icon, "\n".join(details_parts))
+
+    console.print(table)
+
+    if blocking_failed:
+        console.print("[red bold]One or more checks failed — not ready to deploy.[/red bold]")
+        raise typer.Exit(1)
+    console.print("[green bold]All checks passed.[/green bold]")
+
+
+@app.command()
 def status():
     """Show system status and recent activity."""
     init_db()

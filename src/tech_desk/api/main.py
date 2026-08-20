@@ -28,7 +28,6 @@ from tech_desk.database import (
     UpdateORM,
     all_token_samples,
     get_db_session,
-    get_engine,
     get_token_sample,
     init_db,
 )
@@ -212,26 +211,9 @@ async def health():
 
 @app.get("/api/ready")
 async def ready():
-    checks: dict[str, Any] = {}
-    settings = get_settings()
-    try:
-        t0 = time.perf_counter()
-        with get_engine().connect() as conn:
-            conn.execute(text("SELECT 1"))
-        checks["database"] = {
-            "ok": True,
-            "backend": settings.db_backend,
-            "latency_ms": round((time.perf_counter() - t0) * 1000),
-        }
-    except Exception as exc:
-        checks["database"] = {"ok": False, "backend": settings.db_backend, "error": str(exc)}
+    from tech_desk import diagnostics
 
-    data_dir = settings.tech_desk_data_dir
-    checks["disk_writable"] = {"ok": data_dir.exists() and data_dir.is_dir()}
-    checks["api_key_configured"] = {"ok": bool(settings.openai_api_key)}
-
-    all_ok = all(c.get("ok", False) for c in checks.values())
-    return {"status": "ready" if all_ok else "degraded", "checks": checks}
+    return diagnostics.run_all_checks()
 
 
 @app.get("/api/diagnostics")

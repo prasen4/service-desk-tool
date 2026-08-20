@@ -18,6 +18,8 @@ def test_ready_reports_checks(client):
     checks = resp.json()["checks"]
     assert checks["database"]["ok"] is True
     assert checks["disk_writable"]["ok"] is True
+    assert checks["migrations"]["ok"] is True
+    assert checks["desk_config"]["ok"] is True
 
 
 def test_list_desks(client):

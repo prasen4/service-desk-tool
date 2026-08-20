@@ -19,6 +19,21 @@ desks:
       - Amazon
       - Mavvrik
       - NTT DATA
+      - Micron Technology
+      - J.P. Morgan
+      - Oracle
+      - Nutanix
+      - Lambda AI
+      - OpenAI
+      - Snowflake
+      - Crusoe
+      - Civo
+      - Together AI
+      - BMC
+      - Yotta
+      - Volta
+      - IBM
+      - HP Inc.
     areas:
       - cloud infrastructure
       - GPU compute pricing

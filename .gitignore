@@ -4,6 +4,13 @@
 venv/
 env/
 
+# Local-only Docker Compose overrides / corporate CA trust for SearXNG
+# (e.g. Zscaler SSL inspection) — machine-specific, never committed.
+docker-compose.override.yml
+deploy/searxng/*.crt
+deploy/searxng/Dockerfile.local
+
+
 # Data & outputs
 data/
 outputs/
