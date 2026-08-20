@@ -41,10 +41,17 @@ export default function Configure() {
   }, []);
 
   const currentProvider = useMemo(() => catalog?.providers.find((p) => p.id === provider) || null, [catalog, provider]);
-  const currentModel: ModelInfo | null = useMemo(
-    () => currentProvider?.models.find((m) => m.id === model) || null,
-    [currentProvider, model]
-  );
+  const currentModel: ModelInfo | null = useMemo(() => {
+    const fromProvider = currentProvider?.models.find((m) => m.id === model) || null;
+    if (fromProvider) return fromProvider;
+    // Azure deployment names are custom (free-text), but if it happens to match
+    // a known model id (e.g. the deployment was left named after the base
+    // model, like "gpt-5.4"), look up its reference pricing.
+    if (currentProvider?.id === "azure_openai") {
+      return catalog?.all_models.find((m) => m.provider === "azure_openai" && m.id === model) || null;
+    }
+    return null;
+  }, [catalog, currentProvider, model]);
   const isAzure = currentProvider?.id === "azure_openai";
 
   function onProviderChange(id: string) {

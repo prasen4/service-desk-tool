@@ -94,6 +94,10 @@ MODELS: list[dict[str, Any]] = [
     # —— Mistral ——
     {"id": "mistral-large-latest", "provider": "mistral", "label": "Mistral Large", "input": 2.00, "output": 6.00, "context": 128000},
     {"id": "mistral-small-latest", "provider": "mistral", "label": "Mistral Small", "input": 0.20, "output": 0.60, "context": 128000},
+    # —— Azure OpenAI (reference pricing — actual cost depends on your deployment's
+    # region/tier; deployment names are custom, so these aren't shown as a fixed
+    # dropdown, but are used to look up pricing if your deployment name matches) ——
+    {"id": "gpt-5.4", "provider": "azure_openai", "label": "GPT-5.4 (<272k context)", "input": 2.50, "output": 15.00, "context": 272000},
 ]
 
 _MODEL_INDEX = {m["id"]: m for m in MODELS}
@@ -129,10 +133,16 @@ def get_catalog() -> dict[str, Any]:
                 "models": [
                     {k: m[k] for k in ("id", "label", "input", "output", "context")}
                     for m in MODELS
-                    if m["provider"] == pid
+                    # Azure deployment names are user-chosen, not a fixed catalog, so
+                    # its models are exposed only via "all_models" below (used for
+                    # price lookup, not a restrictive dropdown).
+                    if m["provider"] == pid and pid != "azure_openai"
                 ],
             }
             for pid, p in PROVIDERS.items()
+        ],
+        "all_models": [
+            {k: m[k] for k in ("id", "label", "input", "output", "context", "provider")} for m in MODELS
         ],
         "horizons": list(RUNS_PER_MONTH.keys()),
         "tokens_per_desk_per_run": TOKENS_PER_DESK_PER_RUN,

@@ -136,6 +136,7 @@ export interface ProviderInfo {
 
 export interface Catalog {
   providers: ProviderInfo[];
+  all_models: (ModelInfo & { provider: string })[];
   current: { provider: string; model: string; base_url: string; api_version?: string; configured: boolean };
   desk_count: number;
   tokens_per_desk_per_run: Record<string, { input: number; output: number }>;
