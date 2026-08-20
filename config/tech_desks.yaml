@@ -34,6 +34,18 @@ desks:
       - Volta
       - IBM
       - HP Inc.
+      - Fluence
+      - US Signal
+      - Rumble
+      - Marvell Technology
+      - Firmus
+      - Aurionpro Solutions
+      - Runware
+      - Razorpay
+      - Runway
+      - Microsoft
+      - Energy Vault
+      - BrainChip
     areas:
       - cloud infrastructure
       - GPU compute pricing
@@ -64,6 +76,21 @@ desks:
       - xAI
       - Microsoft
       - Alibaba
+      - Meshy
+      - SpaceX
+      - Black Forest Labs
+      - Snowflake
+      - KT
+      - Nvidia
+      - Fastino Labs
+      - LG
+      - Vals AI
+      - Apple
+      - Cerebras
+      - IBM
+      - Runway
+      - River AI
+      - Safe Superintelligence
     areas:
       - foundation models
       - domain-specific LLMs

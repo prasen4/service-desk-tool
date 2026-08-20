@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from difflib import SequenceMatcher
 
@@ -106,19 +107,36 @@ class ResearchCollector:
                 newly_tracked_this_desk: set[str] = set()
                 seen_titles_this_desk: list[str] = []
 
+                # Pre-fetch vendor notes sequentially (the DB session isn't
+                # thread-safe) before analyzing results concurrently below.
                 for result_item in results:
-                    vendor_notes = ""
                     if result_item.target_vendor:
-                        vendor_notes = notes_cache.setdefault(
+                        notes_cache.setdefault(
                             result_item.target_vendor.lower(),
                             vendor_profiles.get_recent_notes_text(session, result_item.target_vendor),
                         )
-                    curated = self.analyzer.analyze_result(
+
+                def _analyze(result_item):
+                    vendor_notes = notes_cache.get((result_item.target_vendor or "").lower(), "")
+                    return self.analyzer.analyze_result(
                         desk,
                         result_item,
                         vendor_notes=vendor_notes,
                         custom_instructions=custom_instructions,
                     )
+
+                # Each analyze_result() call is an independent, blocking LLM
+                # request — run them concurrently instead of one-at-a-time.
+                # executor.map preserves input order, so downstream near-duplicate
+                # dedup (which depends on processing order) behaves identically
+                # to the old sequential loop. Uses its own (lower) concurrency
+                # setting from search — this phase shares a TPM budget with the
+                # LLM provider, unlike the network-bound search phase.
+                concurrency = max(1, self.settings.llm_analysis_concurrency)
+                with ThreadPoolExecutor(max_workers=concurrency) as executor:
+                    curated_results = list(executor.map(_analyze, results))
+
+                for result_item, curated in zip(results, curated_results):
                     if curated is None:
                         continue
 

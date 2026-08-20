@@ -68,6 +68,23 @@ class Settings(BaseSettings):
         default="auto", validation_alias="SEARCH_BACKEND"
     )
 
+    # Max concurrent search queries per desk during a research run. This phase
+    # is purely network-bound (SearXNG/DuckDuckGo HTTP calls) with no shared
+    # token budget, so it's safe to run with more parallelism. Keep modest
+    # anyway — high values increase the chance of provider rate limiting
+    # (especially DuckDuckGo). 1 restores the old fully-sequential behavior.
+    search_concurrency: int = Field(default=5, validation_alias="SEARCH_CONCURRENCY")
+
+    # Max concurrent LLM analysis calls per desk during a research run. Unlike
+    # search, this phase shares a single tokens-per-minute (TPM) budget with
+    # your LLM provider account — pushing too many requests at once causes
+    # 429 rate-limit errors, and any that fail after the client's own retries
+    # are silently dropped (that update just won't appear in the report). Keep
+    # this well below your provider's TPM/RPM tier; 2 is a safe default for
+    # accounts on lower tiers (e.g. OpenAI's default 30k TPM for gpt-4o). 1
+    # restores the old fully-sequential behavior.
+    llm_analysis_concurrency: int = Field(default=2, validation_alias="LLM_ANALYSIS_CONCURRENCY")
+
     @field_validator("search_backend", mode="before")
     @classmethod
     def _normalize_search_backend(cls, v):

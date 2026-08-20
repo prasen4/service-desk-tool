@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import random
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from urllib.parse import urlparse
 
@@ -82,6 +83,7 @@ class WebSearcher:
         self.max_results = max_results or settings.research_max_results_per_query
         self.searxng_url = (settings.searxng_url or "").rstrip("/") or None
         self.backend = settings.search_backend
+        self.concurrency = max(1, settings.search_concurrency)
 
     def _query_searxng(self, query: str, *, timelimit: str | None, categories: str | None) -> list[ResearchResult]:
         """Single SearXNG HTTP call. Raises on failure (caller decides fallback)."""
@@ -227,6 +229,12 @@ class WebSearcher:
         return results[: self.max_results]
 
     def search_desk(self, desk: TechDeskDefinition, *, depth_multiplier: int = 1) -> list[ResearchResult]:
+        """Run all of a desk's search queries and merge/dedup the results.
+
+        Queries run concurrently (bounded by SEARCH_CONCURRENCY) since each is
+        an independent network call — this is the dominant cost of a research
+        run alongside LLM analysis, and both are I/O-bound.
+        """
         all_results: list[ResearchResult] = []
         seen_urls: set[str] = set()
         queries: list[tuple[str, str]] = [(q, "") for q in desk.search_queries]
@@ -242,15 +250,21 @@ class WebSearcher:
 
         timelimit = "m"
 
-        for i, (query, vendor) in enumerate(queries):
-            if i > 0:
-                # Small pause so the query burst doesn't look like automated
-                # scraping, without adding significant runtime.
-                time.sleep(random.uniform(0.2, 0.5))
-            for result in self.search(query, timelimit=timelimit):
-                if result.url not in seen_urls:
-                    seen_urls.add(result.url)
-                    result.target_vendor = vendor
-                    all_results.append(result)
+        with ThreadPoolExecutor(max_workers=self.concurrency) as executor:
+            future_to_vendor = {
+                executor.submit(self.search, query, timelimit=timelimit): vendor for query, vendor in queries
+            }
+            for future in as_completed(future_to_vendor):
+                vendor = future_to_vendor[future]
+                try:
+                    results = future.result()
+                except Exception as exc:
+                    logger.error("Search query failed: %s", exc)
+                    continue
+                for result in results:
+                    if result.url not in seen_urls:
+                        seen_urls.add(result.url)
+                        result.target_vendor = vendor
+                        all_results.append(result)
 
         return all_results

@@ -298,23 +298,27 @@ def test_collector_dedupes_near_duplicate_titles(monkeypatch):
             ResearchResult(title="NTT DATA opens new Sydney AI innovation centre", url="https://b.example.com/2"),
         ]
     )
-    updates = [
-        CuratedUpdate(
+    updates_by_url = {
+        "https://a.example.com/1": CuratedUpdate(
             desk_id="models",
             title="NTT DATA Opens Sydney Innovation Centre for AI",
             summary="NTT DATA opened a new AI-focused innovation centre in Sydney.",
             source_url="https://a.example.com/1",
             vendor="NTT DATA",
         ),
-        CuratedUpdate(
+        "https://b.example.com/2": CuratedUpdate(
             desk_id="models",
             title="NTT DATA opens new Sydney AI innovation centre",
             summary="NTT DATA opened a new AI-focused innovation centre in Sydney.",
             source_url="https://b.example.com/2",
             vendor="NTT DATA",
         ),
-    ]
-    collector.analyzer.analyze_result = MagicMock(side_effect=updates)
+    }
+    # Analysis now runs concurrently across a thread pool, so key the mock's
+    # response off the input result's URL rather than call order.
+    collector.analyzer.analyze_result = MagicMock(
+        side_effect=lambda desk, result, **kwargs: updates_by_url[result.url]
+    )
     monkeypatch.setattr(collector_module, "add_vendor_to_desk", lambda desk_id, vendor: None)
 
     result = collector.run(period="daily", desk_keys=["M"])

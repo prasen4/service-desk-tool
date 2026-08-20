@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
 from dataclasses import dataclass
 from typing import Any
 
@@ -61,6 +62,9 @@ class LLMClient:
         key = (api_key or settings.openai_api_key or "").strip()
         self.api_key = key
         self.usage = {"input": 0, "output": 0, "calls": 0}
+        # analyze_result() calls run concurrently across worker threads during
+        # research runs, and this client instance is shared across them.
+        self._usage_lock = threading.Lock()
         self._http_client = _build_http_client()
 
         default_base = PROVIDERS[self.provider]["base_url"] or settings.openai_base_url
@@ -177,9 +181,12 @@ class LLMClient:
         if usage is None:
             return
         try:
-            self.usage["input"] += int(getattr(usage, in_attr, 0) or 0)
-            self.usage["output"] += int(getattr(usage, out_attr, 0) or 0)
-            self.usage["calls"] += 1
+            in_tokens = int(getattr(usage, in_attr, 0) or 0)
+            out_tokens = int(getattr(usage, out_attr, 0) or 0)
+            with self._usage_lock:
+                self.usage["input"] += in_tokens
+                self.usage["output"] += out_tokens
+                self.usage["calls"] += 1
         except Exception:
             pass
 

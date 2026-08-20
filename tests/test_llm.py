@@ -67,3 +67,27 @@ def test_record_usage_accumulates():
         assert client.usage == {"input": 240, "output": 60, "calls": 2}
     finally:
         client.close()
+
+
+def test_record_usage_is_thread_safe_under_concurrency():
+    """analyze_result() calls now run concurrently across worker threads
+    sharing one LLMClient — usage counters must not lose updates to races."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    client = LLMClient(api_key="sk-test", model="gpt-4o")
+    try:
+        class Usage:
+            prompt_tokens = 10
+            completion_tokens = 5
+
+        call_count = 200
+
+        def _record(_i):
+            client._record_usage(Usage(), "prompt_tokens", "completion_tokens")
+
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            list(executor.map(_record, range(call_count)))
+
+        assert client.usage == {"input": 10 * call_count, "output": 5 * call_count, "calls": call_count}
+    finally:
+        client.close()
