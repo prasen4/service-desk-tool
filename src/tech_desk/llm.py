@@ -147,6 +147,13 @@ class LLMClient:
         }
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
+        # Read once up front: this is what THIS call actually sends, and is what
+        # the retry decision below must key off. Do not re-check the shared
+        # self._needs_max_completion_tokens flag inside the except block — other
+        # concurrent calls on this same instance may flip it between when this
+        # call started and when its own request fails, which would incorrectly
+        # skip this call's own retry (a real race observed in production with
+        # concurrent analysis workers).
         token_param = "max_completion_tokens" if self._needs_max_completion_tokens else "max_tokens"
         kwargs[token_param] = max_tokens
 
@@ -154,7 +161,7 @@ class LLMClient:
             response = self._client.chat.completions.create(**kwargs)
         except Exception as exc:
             if (
-                not self._needs_max_completion_tokens
+                token_param == "max_tokens"
                 and "max_tokens" in str(exc)
                 and "max_completion_tokens" in str(exc)
             ):
@@ -238,7 +245,7 @@ class LLMClient:
                 )
             except Exception as exc:
                 if (
-                    not self._needs_max_completion_tokens
+                    token_param == "max_tokens"
                     and "max_tokens" in str(exc)
                     and "max_completion_tokens" in str(exc)
                 ):
