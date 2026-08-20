@@ -65,6 +65,11 @@ class LLMClient:
         # analyze_result() calls run concurrently across worker threads during
         # research runs, and this client instance is shared across them.
         self._usage_lock = threading.Lock()
+        # Newer models (e.g. GPT-5 family, o-series reasoning models) reject the
+        # legacy `max_tokens` param and require `max_completion_tokens` instead.
+        # Detected lazily on first 400 and cached so we don't eat an extra
+        # round-trip on every subsequent call.
+        self._needs_max_completion_tokens = False
         self._http_client = _build_http_client()
 
         default_base = PROVIDERS[self.provider]["base_url"] or settings.openai_base_url
@@ -139,12 +144,27 @@ class LLMClient:
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": temperature,
-            "max_tokens": max_tokens,
         }
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
+        token_param = "max_completion_tokens" if self._needs_max_completion_tokens else "max_tokens"
+        kwargs[token_param] = max_tokens
 
-        response = self._client.chat.completions.create(**kwargs)
+        try:
+            response = self._client.chat.completions.create(**kwargs)
+        except Exception as exc:
+            if (
+                not self._needs_max_completion_tokens
+                and "max_tokens" in str(exc)
+                and "max_completion_tokens" in str(exc)
+            ):
+                self._needs_max_completion_tokens = True
+                kwargs.pop("max_tokens", None)
+                kwargs["max_completion_tokens"] = max_tokens
+                response = self._client.chat.completions.create(**kwargs)
+            else:
+                raise
+
         self._record_usage(getattr(response, "usage", None), "prompt_tokens", "completion_tokens")
         content = response.choices[0].message.content
         if not content:
@@ -209,11 +229,27 @@ class LLMClient:
 
     def _validate_openai(self) -> ValidationResult:
         try:
-            self._client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": "Reply with OK"}],
-                max_tokens=2,
-            )
+            token_param = "max_completion_tokens" if self._needs_max_completion_tokens else "max_tokens"
+            try:
+                self._client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": "Reply with OK"}],
+                    **{token_param: 2},
+                )
+            except Exception as exc:
+                if (
+                    not self._needs_max_completion_tokens
+                    and "max_tokens" in str(exc)
+                    and "max_completion_tokens" in str(exc)
+                ):
+                    self._needs_max_completion_tokens = True
+                    self._client.chat.completions.create(
+                        model=self.model,
+                        messages=[{"role": "user", "content": "Reply with OK"}],
+                        max_completion_tokens=2,
+                    )
+                else:
+                    raise
             return ValidationResult(True)
         except AuthenticationError as exc:
             logger.warning("API key authentication failed: %s", exc)
