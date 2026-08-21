@@ -4,17 +4,17 @@ import { useTheme } from "../hooks/useTheme";
 import { useJobActivity } from "../hooks/useJobActivity";
 
 const NAV_ITEMS = [
-  { to: "/", icon: "📊", label: "Dashboard", end: true },
-  { to: "/research", icon: "🔍", label: "Research" },
-  { to: "/reports", icon: "📋", label: "Reports" },
-  { to: "/updates", icon: "📰", label: "Updates Feed" },
-  { to: "/vendors", icon: "🏷️", label: "Vendor News" },
-  { to: "/desks", icon: "🏢", label: "Tech Desks" },
+  { to: "/", label: "Dashboard", end: true },
+  { to: "/research", label: "Research" },
+  { to: "/reports", label: "Reports" },
+  { to: "/updates", label: "Updates Feed" },
+  { to: "/vendors", label: "Vendor News" },
+  { to: "/desks", label: "Tech Desks" },
 ];
 
 const SETTINGS_ITEMS = [
-  { to: "/activity", icon: "⚡", label: "Activity", badge: true },
-  { to: "/configure", icon: "🔑", label: "LLM Setup" },
+  { to: "/activity", label: "Activity", badge: true },
+  { to: "/configure", label: "LLM Setup" },
 ];
 
 export default function Sidebar() {
@@ -42,7 +42,6 @@ export default function Sidebar() {
             end={item.end}
             className={({ isActive }) => "nav-item" + (isActive ? " active" : "")}
           >
-            <span className="nav-icon">{item.icon}</span>
             {item.label}
           </NavLink>
         ))}
@@ -52,7 +51,6 @@ export default function Sidebar() {
           aria-expanded={settingsOpen}
           onClick={() => setSettingsOpen((open) => !open)}
         >
-          <span className="nav-icon">⚙️</span>
           Settings
           {activeCount > 0 && !settingsOpen && <span className="nav-badge visible">{activeCount}</span>}
           <span className={"nav-chevron" + (settingsOpen ? " open" : "")}>▾</span>
@@ -65,7 +63,6 @@ export default function Sidebar() {
                 to={item.to}
                 className={({ isActive }) => "nav-item nav-subitem" + (isActive ? " active" : "")}
               >
-                <span className="nav-icon">{item.icon}</span>
                 {item.label}
                 {item.badge && (
                   <span className={"nav-badge" + (activeCount > 0 ? " visible" : "")}>{activeCount}</span>

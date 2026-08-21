@@ -44,11 +44,20 @@ export default function Configure() {
   const currentModel: ModelInfo | null = useMemo(() => {
     const fromProvider = currentProvider?.models.find((m) => m.id === model) || null;
     if (fromProvider) return fromProvider;
-    // Azure deployment names are custom (free-text), but if it happens to match
-    // a known model id (e.g. the deployment was left named after the base
-    // model, like "gpt-5.4"), look up its reference pricing.
-    if (currentProvider?.id === "azure_openai") {
-      return catalog?.all_models.find((m) => m.provider === "azure_openai" && m.id === model) || null;
+    // Azure deployment names are custom (free-text), and commonly include the
+    // base model name as part of a longer alias (e.g. "tech-desk-gpt-5.4"
+    // rather than a bare "gpt-5.4"). Match by substring containment against
+    // known model ids instead of requiring an exact match, so pricing still
+    // resolves for these custom deployment names — pick the longest/most
+    // specific match if more than one known id is contained.
+    if (currentProvider?.id === "azure_openai" && model.trim()) {
+      const needle = model.trim().toLowerCase();
+      const matches = (catalog?.all_models || []).filter(
+        (m) => m.provider === "azure_openai" && needle.includes(m.id.toLowerCase())
+      );
+      if (matches.length) {
+        return matches.reduce((best, m) => (m.id.length > best.id.length ? m : best));
+      }
     }
     return null;
   }, [catalog, currentProvider, model]);
