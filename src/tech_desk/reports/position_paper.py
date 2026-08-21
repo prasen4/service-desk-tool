@@ -208,7 +208,11 @@ IMPORTANT: "competitors" must always include at least 2-3 real, specifically-nam
 {vendor_name} in its category — draw on general market knowledge for this if the web findings above didn't
 surface any by name. Never return an empty competitors list."""
         try:
-            return self.llm.chat_json(RESEARCH_BRIEF_SYSTEM_PROMPT, prompt, temperature=0.3, max_tokens=2500)
+            # Reasoning models (e.g. gpt-5.4) spend part of this budget on
+            # hidden reasoning tokens before emitting visible output, so this
+            # needs real headroom above what the JSON schema itself requires —
+            # too low a limit here previously produced truncated/empty JSON.
+            return self.llm.chat_json(RESEARCH_BRIEF_SYSTEM_PROMPT, prompt, temperature=0.3, max_tokens=6000)
         except Exception as exc:
             logger.warning("Research brief generation failed for %s: %s", vendor_name, exc)
             return {"snapshot": f"Research brief unavailable: {exc}"}
@@ -249,7 +253,10 @@ IMPORTANT: use the SAME real competitor product names (as keys in "values") cons
 or an empty comparison_table — use general knowledge of this vendor's market to name 2-3 real competitors if the
 research brief didn't supply any."""
         try:
-            return self.llm.chat_json(POSITION_PAPER_SYSTEM_PROMPT, prompt, temperature=0.4, max_tokens=3500)
+            # Same reasoning-token headroom concern as the research brief —
+            # this prompt asks for a longer, multi-section document (exec
+            # summary, comparison table, insights, etc.), so it needs even more.
+            return self.llm.chat_json(POSITION_PAPER_SYSTEM_PROMPT, prompt, temperature=0.4, max_tokens=8000)
         except Exception as exc:
             logger.warning("Position paper draft failed for %s: %s", vendor_name, exc)
             return {"executive_summary": f"Position paper draft unavailable: {exc}"}
@@ -281,15 +288,23 @@ research brief didn't supply any."""
         banner_path = assets_dir / "cover_banner.png"
 
         def add_floating_picture(
-            paragraph, image_path: Path, width_in: float, height_in: float, x_in: float, y_in: float, behind: bool = True
+            paragraph, image_path: Path, width_in: float, height_in: float | None, x_in: float, y_in: float, behind: bool = True
         ) -> None:
             """Insert a page-anchored (floating) picture — used for the cover
             page's full-height banner graphic and logo, matching the template's
-            header artwork rather than an inline image that would push text."""
+            header artwork rather than an inline image that would push text.
+
+            height_in may be None, in which case python-docx computes it from
+            the image's own native aspect ratio (avoids stretching/squashing
+            logos that don't exactly match a hardcoded width:height ratio).
+            """
             if not image_path.exists():
                 return
             run = paragraph.add_run()
-            run.add_picture(str(image_path), width=Inches(width_in), height=Inches(height_in))
+            if height_in is None:
+                run.add_picture(str(image_path), width=Inches(width_in))
+            else:
+                run.add_picture(str(image_path), width=Inches(width_in), height=Inches(height_in))
             drawing = run._r.find(qn("w:drawing"))
             inline = drawing.find(qn("wp:inline"))
             extent = inline.find(qn("wp:extent"))
@@ -411,7 +426,7 @@ research brief didn't supply any."""
         fp_header.is_linked_to_previous = False
         fp_header_p = fp_header.paragraphs[0]
         fp_header_p.text = ""
-        add_floating_picture(fp_header_p, logo_path, 2.36, 0.33, 1.0, 0.75, behind=False)
+        add_floating_picture(fp_header_p, logo_path, 2.36, None, 1.0, 0.75, behind=False)
         add_floating_picture(fp_header_p, banner_path, 2.84, 8.63, 5.66, 0.0, behind=True)
 
         fp_footer = section.first_page_footer
@@ -422,7 +437,7 @@ research brief didn't supply any."""
         header.is_linked_to_previous = False
         header_p = header.paragraphs[0]
         header_p.text = ""
-        add_floating_picture(header_p, logo_path, 1.53, 0.21, 5.97, 0.3, behind=False)
+        add_floating_picture(header_p, logo_path, 1.53, None, 5.97, 0.3, behind=False)
 
         footer = section.footer
         footer.is_linked_to_previous = False
