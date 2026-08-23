@@ -41,24 +41,31 @@ export default function Dashboard() {
   }, []);
 
   async function runPipeline() {
-    setRunning(true);
     setError(null);
-    try {
-      const payload: Record<string, unknown> = { period: pipelinePeriod };
-      if (pipelineDesk) payload.desk_ids = [pipelineDesk];
-      const result = await runJob("/api/pipeline/run", payload, {
-        start: "Starting Pipeline",
-        running: "Pipeline Running",
-        wait: "Researching web, curating with AI, generating brief...",
+    setRunning(true);
+    const payload: Record<string, unknown> = { period: pipelinePeriod };
+    if (pipelineDesk) payload.desk_ids = [pipelineDesk];
+    // Fire the job off and track its completion separately from the button's
+    // disabled state — the backend dedupes concurrent requests for the SAME
+    // scope (period + desk) by joining the existing job, but different
+    // desks/periods are meant to run truly in parallel. Awaiting the full
+    // runJob() call here (which polls until the job finishes) would keep
+    // this button disabled for the entire run, blocking anyone from
+    // starting a second, differently-scoped pipeline run in the meantime.
+    runJob("/api/pipeline/run", payload, {
+      start: "Starting Pipeline",
+      running: "Pipeline Running",
+      wait: "Researching web, curating with AI, generating brief...",
+    })
+      .then((result) => {
+        const r = result.report;
+        alert(`Pipeline complete!\n\nUpdates: ${result.research.updates_found}\nReport: ${r.title}`);
+        load();
+      })
+      .catch((e: any) => {
+        setError(e.message || "Pipeline run failed");
       });
-      const r = result.report;
-      alert(`Pipeline complete!\n\nUpdates: ${result.research.updates_found}\nReport: ${r.title}`);
-      load();
-    } catch (e: any) {
-      setError(e.message || "Pipeline run failed");
-    } finally {
-      setRunning(false);
-    }
+    setRunning(false);
   }
 
   return (
