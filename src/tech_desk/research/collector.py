@@ -11,7 +11,7 @@ from difflib import SequenceMatcher
 from sqlalchemy.orm import Session
 
 from tech_desk import vendor_profiles
-from tech_desk.config import ReportPeriod, add_vendor_to_desk, get_settings, resolve_desks
+from tech_desk.config import ReportPeriod, add_vendor_to_desk, get_settings, list_desk_definitions, resolve_desks
 from tech_desk.database import ResearchRunORM, UpdateORM, init_db, research_run_from_orm, tags_to_json
 from tech_desk.llm import LLMClient
 from tech_desk.models import ResearchRunResult
@@ -81,6 +81,14 @@ class ResearchCollector:
         desks = resolve_desks(desk_keys)
         custom_instructions = (custom_instructions or "").strip()
 
+        # Fetched independently of `desk_keys` scoping so each desk's analysis
+        # always has full visibility into every OTHER desk's focus area, even
+        # when this run only targets a single desk — needed for the analyzer's
+        # cross-desk boundary check (e.g. an AI-infrastructure/chip story
+        # shouldn't get accepted onto the Gen AI Models desk just because it
+        # mentions a model vendor in passing).
+        all_desk_defs = list_desk_definitions()
+
         run = ResearchRunORM(period=period, status="running", custom_instructions=custom_instructions or None)
         session.add(run)
         session.flush()
@@ -106,6 +114,7 @@ class ResearchCollector:
                 tracked_lower = {v.lower() for v in desk.key_vendors}
                 newly_tracked_this_desk: set[str] = set()
                 seen_titles_this_desk: list[str] = []
+                other_desks = [d for d in all_desk_defs if d.id != desk.id]
 
                 # Pre-fetch vendor notes sequentially (the DB session isn't
                 # thread-safe) before analyzing results concurrently below.
@@ -123,6 +132,7 @@ class ResearchCollector:
                         result_item,
                         vendor_notes=vendor_notes,
                         custom_instructions=custom_instructions,
+                        other_desks=other_desks,
                     )
 
                 # Each analyze_result() call is an independent, blocking LLM

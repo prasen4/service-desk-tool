@@ -25,6 +25,18 @@ are just as relevant as tracked ones, and should be surfaced under their own ven
 they can be picked up for tracking too. Only mark relevant if it represents meaningful vendor
 developments: product launches, partnerships, funding, research, regulations, or major vendor moves.
 
+CORE-SUBJECT TEST — mentioning a tracked vendor, or using AI/tech buzzwords, is NOT enough.
+The story's PRIMARY, CENTRAL subject must actually be one of this desk's focus areas below —
+not merely adjacent to it or thematically connected. Before marking relevant, strip away the
+AI buzzwords and ask: "what is this story actually, concretely about?" For example, a chip
+supply deal, GPU/data-center capacity buildout, or cloud infrastructure investment is about
+INFRASTRUCTURE — not about foundation models — even if the parties involved happen to make or
+use AI models, and even if the article frames it as enabling "AI" broadly. If a story would be
+equally true with the word "AI" deleted from it (e.g. it's really just a chip/hardware/capital
+deal, a corporate earnings note, or a generic partnership announcement), it almost certainly
+fails this desk's focus areas and should be marked not relevant here — it likely belongs, if
+anywhere, to a different desk (see boundaries below, if provided).
+
 STRICT quality bar — set "specific_event": false (even if otherwise topically relevant) for:
 - Generic "market trends", "industry forecast/report", or "X in <year>" pieces with no
   specific vendor action tied to one real, dateable event.
@@ -67,6 +79,7 @@ class UpdateAnalyzer:
         *,
         vendor_notes: str = "",
         custom_instructions: str = "",
+        other_desks: list[TechDeskDefinition] | None = None,
     ) -> CuratedUpdate | None:
         areas_text = ", ".join(desk.areas)
         sub_areas_text = ""
@@ -78,12 +91,23 @@ class UpdateAnalyzer:
         hint_vendor = result.target_vendor or "unknown"
         notes_block = f"\nAnalyst notes on {hint_vendor} (context only, not a relevance filter):\n{vendor_notes}\n" if vendor_notes else ""
         instructions_block = f"\nAdditional guidance for this run: {custom_instructions}\n" if custom_instructions else ""
+
+        boundaries_block = ""
+        if other_desks:
+            lines = [f"- {d.name}: {d.description}" for d in other_desks if d.description]
+            if lines:
+                boundaries_block = (
+                    "\nOther desks exist for adjacent topics — if this story's core subject matches one of "
+                    "THESE instead of the focus areas above, mark it NOT relevant here (it belongs there, not "
+                    "on this desk):\n" + "\n".join(lines) + "\n"
+                )
+
         user_prompt = f"""Tech Desk: {desk.name} ({desk.code})
 Description: {desk.description}
 Focus areas: {areas_text}{sub_areas_text}
 Vendors already tracked on this desk (for reference only — not exhaustive, not a filter): {vendors_text}
 Search target vendor (if any): {hint_vendor}
-{notes_block}{instructions_block}
+{notes_block}{instructions_block}{boundaries_block}
 Evaluate this search result:
 Title: {result.title}
 URL: {result.url}
