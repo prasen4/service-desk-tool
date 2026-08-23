@@ -85,6 +85,15 @@ class Settings(BaseSettings):
     # restores the old fully-sequential behavior.
     llm_analysis_concurrency: int = Field(default=2, validation_alias="LLM_ANALYSIS_CONCURRENCY")
 
+    # Max number of background jobs (research/report/pipeline/position-paper)
+    # that can execute at the same time across ALL users. Extra submissions
+    # beyond this just queue and start as soon as a slot frees up — they are
+    # not rejected. Raise this to let more people run pipelines concurrently,
+    # but remember each job also fans out its own LLM concurrency (see
+    # llm_analysis_concurrency), so the effective concurrent LLM call count is
+    # roughly job_max_workers * llm_analysis_concurrency.
+    job_max_workers: int = Field(default=4, validation_alias="JOB_MAX_WORKERS")
+
     @field_validator("search_backend", mode="before")
     @classmethod
     def _normalize_search_backend(cls, v):

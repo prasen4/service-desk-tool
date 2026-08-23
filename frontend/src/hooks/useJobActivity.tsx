@@ -68,12 +68,26 @@ export function JobActivityProvider({ children }: { children: ReactNode }) {
       activeLocalJob.current = true;
       setStatusBar({ title: labels.start, msg: labels.wait, progress: 2 });
       try {
-        const { job_id } = await api.post<{ job_id: string }>(endpoint, { ...payload, async_mode: true });
+        const { job_id, joined_existing } = await api.post<{ job_id: string; joined_existing?: boolean }>(
+          endpoint,
+          { ...payload, async_mode: true }
+        );
+        if (joined_existing) {
+          setStatusBar({
+            title: "Already running",
+            msg: "Someone already started this — tracking their run instead of starting a duplicate.",
+            progress: 5,
+          });
+        }
         refresh();
         // eslint-disable-next-line no-constant-condition
         while (true) {
           const job = await api.get<Job>(`/api/jobs/${job_id}`);
-          setStatusBar({ title: labels.running, msg: job.message || labels.wait, progress: job.progress || 10 });
+          setStatusBar({
+            title: joined_existing ? "Joined existing run" : labels.running,
+            msg: job.message || labels.wait,
+            progress: job.progress || 10,
+          });
           if (job.status === "completed") {
             setStatusBar(null);
             return job.result;

@@ -31,6 +31,11 @@ class Job:
     completed_at: datetime | None = None
     result: dict[str, Any] | None = None
     error: str | None = None
+    # Dedup scope, e.g. "daily:desk-a,desk-b" — lets JobManager detect that
+    # another user already kicked off an equivalent job (same job_type + key)
+    # so it doesn't run twice. Not persisted/exposed via to_dict(); it's only
+    # used for in-memory duplicate detection.
+    key: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -106,9 +111,18 @@ def _load_recent_from_db(limit: int = 100) -> list[Job]:
 
 
 class JobManager:
-    """In-process background job runner for long-running pipeline tasks."""
+    """In-process background job runner for long-running pipeline tasks.
 
-    def __init__(self, max_workers: int = 2):
+    ``max_workers`` bounds how many jobs (across all users/job types) can
+    execute at the same time; extra submissions queue in the executor and
+    start as soon as a worker frees up rather than being rejected. Raise this
+    to let more users run pipelines concurrently — but note each research/
+    report job itself opens further LLM concurrency (see
+    ``llm_analysis_concurrency``), so pushing this too high multiplies
+    concurrent LLM calls and can trip provider rate limits.
+    """
+
+    def __init__(self, max_workers: int = 4):
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="techdesk")
         self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
@@ -125,9 +139,37 @@ class JobManager:
         self._running = False
         self._executor.shutdown(wait=False, cancel_futures=True)
 
-    def submit(self, job_type: str, fn: Callable[..., dict[str, Any]], **kwargs) -> str:
+    def find_active(self, job_type: str, key: str) -> Job | None:
+        """Return an already pending/running job with the same job_type+key,
+        if any — used to avoid starting a duplicate run (e.g. two users
+        triggering the same desk/period pipeline at once)."""
+        with self._lock:
+            candidates = [
+                j
+                for j in self._jobs.values()
+                if j.job_type == job_type and j.key == key and j.status in (JobStatus.PENDING, JobStatus.RUNNING)
+            ]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda j: j.created_at)
+
+    def submit(
+        self, job_type: str, fn: Callable[..., dict[str, Any]], *, key: str | None = None, **kwargs
+    ) -> tuple[str, bool]:
+        """Queue a job for background execution.
+
+        Returns ``(job_id, joined_existing)``. If ``key`` is given and a
+        pending/running job with the same ``job_type``+``key`` already
+        exists, that job's id is returned instead of starting a duplicate,
+        with ``joined_existing=True``.
+        """
+        if key is not None:
+            existing = self.find_active(job_type, key)
+            if existing is not None:
+                return existing.id, True
+
         job_id = uuid.uuid4().hex[:12]
-        job = Job(id=job_id, job_type=job_type)
+        job = Job(id=job_id, job_type=job_type, key=key)
         with self._lock:
             self._jobs[job_id] = job
             # Keep last 100 jobs in memory (DB retains full history)
@@ -164,7 +206,7 @@ class JobManager:
                 )
 
         self._executor.submit(_run)
-        return job_id
+        return job_id, False
 
     def _update(self, job_id: str, **fields) -> None:
         with self._lock:
@@ -197,4 +239,13 @@ class JobManager:
             return jobs[:limit]
 
 
-job_manager = JobManager()
+def _make_job_manager() -> JobManager:
+    try:
+        from tech_desk.config import get_settings
+
+        return JobManager(max_workers=get_settings().job_max_workers)
+    except Exception:
+        return JobManager()
+
+
+job_manager = _make_job_manager()

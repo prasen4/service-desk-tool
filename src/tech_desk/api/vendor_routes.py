@@ -142,13 +142,14 @@ async def generate_position_paper(vendor_name: str, req: PositionPaperRequest):
     search, then drafts the paper via a two-stage LLM pipeline.
     """
     if req.async_mode:
-        job_id = job_manager.submit(
+        job_id, joined_existing = job_manager.submit(
             "position_paper",
             run_position_paper_job,
+            key=vendor_name.strip().lower(),
             vendor_name=vendor_name,
             custom_prompt=req.custom_prompt,
         )
-        return {"job_id": job_id, "status": "pending"}
+        return {"job_id": job_id, "status": "pending", "joined_existing": joined_existing}
 
     try:
         return run_position_paper_job(vendor_name=vendor_name, custom_prompt=req.custom_prompt)

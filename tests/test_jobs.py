@@ -24,7 +24,8 @@ def test_job_completes_and_reports_progress():
         seen.append(50)
         return {"answer": 42}
 
-    job_id = manager.submit("unit", work)
+    job_id, joined = manager.submit("unit", work)
+    assert joined is False
     assert _wait_for(lambda: manager.get(job_id).status == JobStatus.COMPLETED)
 
     job = manager.get(job_id)
@@ -42,7 +43,7 @@ def test_job_records_failure():
     def broken(progress):
         raise ValueError("boom")
 
-    job_id = manager.submit("unit", broken)
+    job_id, _ = manager.submit("unit", broken)
     assert _wait_for(lambda: manager.get(job_id).status == JobStatus.FAILED)
 
     job = manager.get(job_id)
@@ -54,7 +55,7 @@ def test_job_records_failure():
 def test_list_recent_orders_newest_first_and_is_bounded():
     manager = JobManager(max_workers=2)
     manager.start()
-    ids = [manager.submit("unit", lambda progress: {"ok": True}) for _ in range(5)]
+    ids = [manager.submit("unit", lambda progress: {"ok": True})[0] for _ in range(5)]
     assert _wait_for(lambda: all(manager.get(i).status == JobStatus.COMPLETED for i in ids))
 
     recent = manager.list_recent(limit=3)
@@ -67,7 +68,7 @@ def test_list_recent_orders_newest_first_and_is_bounded():
 def test_to_dict_is_json_friendly():
     manager = JobManager(max_workers=1)
     manager.start()
-    job_id = manager.submit("pipeline", lambda progress: {"done": 1})
+    job_id, _ = manager.submit("pipeline", lambda progress: {"done": 1})
     assert _wait_for(lambda: manager.get(job_id).status == JobStatus.COMPLETED)
 
     data = manager.get(job_id).to_dict()
@@ -76,3 +77,35 @@ def test_to_dict_is_json_friendly():
     assert isinstance(data["created_at"], str)
     assert data["result"] == {"done": 1}
     manager.shutdown()
+
+
+def test_submit_with_same_key_joins_existing_running_job():
+    import threading
+
+    manager = JobManager(max_workers=2)
+    manager.start()
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow(progress):
+        started.set()
+        release.wait(timeout=5.0)
+        return {"done": True}
+
+    job_id_1, joined_1 = manager.submit("pipeline", slow, key="daily:all")
+    assert joined_1 is False
+    assert started.wait(timeout=5.0)
+
+    job_id_2, joined_2 = manager.submit("pipeline", slow, key="daily:all")
+    assert joined_2 is True
+    assert job_id_2 == job_id_1
+
+    # A different scope (different key) must NOT be treated as a duplicate.
+    job_id_3, joined_3 = manager.submit("pipeline", lambda progress: {"ok": True}, key="weekly:all")
+    assert joined_3 is False
+    assert job_id_3 != job_id_1
+
+    release.set()
+    assert _wait_for(lambda: manager.get(job_id_1).status == JobStatus.COMPLETED)
+    manager.shutdown()
+
