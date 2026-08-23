@@ -109,3 +109,35 @@ def test_submit_with_same_key_joins_existing_running_job():
     assert _wait_for(lambda: manager.get(job_id_1).status == JobStatus.COMPLETED)
     manager.shutdown()
 
+
+def test_start_marks_orphaned_running_jobs_as_failed(monkeypatch):
+    from datetime import datetime, timezone
+
+    import tech_desk.api.jobs as jobs_module
+
+    orphan = jobs_module.Job(
+        id="orphan1",
+        job_type="pipeline",
+        status=JobStatus.RUNNING,
+        key="daily:all",
+        created_at=datetime.now(timezone.utc),
+    )
+    monkeypatch.setattr(jobs_module, "_load_recent_from_db", lambda limit=100: [orphan])
+    monkeypatch.setattr(jobs_module, "_persist", lambda job: None)
+
+    manager = jobs_module.JobManager(max_workers=1)
+    manager.start()
+
+    rehydrated = manager.get("orphan1")
+    assert rehydrated.status == JobStatus.FAILED
+    assert rehydrated.error == "Interrupted by server restart"
+
+    # A new submission with the same job_type+key must NOT join the orphan —
+    # it should start fresh since the orphan is no longer active.
+    job_id, joined = manager.submit("pipeline", lambda progress: {"ok": True}, key="daily:all")
+    assert joined is False
+    assert job_id != "orphan1"
+    assert _wait_for(lambda: manager.get(job_id).status == JobStatus.COMPLETED)
+    manager.shutdown()
+
+

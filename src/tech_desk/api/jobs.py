@@ -131,8 +131,19 @@ class JobManager:
     def start(self) -> None:
         self._running = True
         # Rehydrate recent job history from the DB so the Activity view isn't
-        # empty right after a restart/redeploy.
+        # empty right after a restart/redeploy. Any job still PENDING/RUNNING
+        # in that history belongs to a *previous* process (this is a fresh
+        # ThreadPoolExecutor with nothing actually executing it) — most often
+        # because a redeploy's shutdown() killed its thread mid-flight before
+        # it could persist a final status. Mark those as failed/orphaned so
+        # they don't (a) show as forever "running" in the Activity view, and
+        # (b) permanently block new same-scope submissions via find_active().
         for job in _load_recent_from_db(limit=100):
+            if job.status in (JobStatus.PENDING, JobStatus.RUNNING):
+                job.status = JobStatus.FAILED
+                job.error = "Interrupted by server restart"
+                job.completed_at = datetime.now(timezone.utc)
+                _persist(job)
             self._jobs.setdefault(job.id, job)
 
     def shutdown(self) -> None:
