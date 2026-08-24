@@ -124,6 +124,12 @@ export default function Reports() {
                       </>
                     )}{" "}
                     · <a className="link" href={`/api/reports/${r.id}/download/markdown`}>MD</a>
+                    {r.has_docx && (
+                      <>
+                        {" "}
+                        · <a className="link" href={`/api/reports/${r.id}/download/docx`}>DOCX</a>
+                      </>
+                    )}
                   </td>
                 </tr>
                 );

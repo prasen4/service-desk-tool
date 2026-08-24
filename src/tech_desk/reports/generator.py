@@ -94,7 +94,8 @@ class ReportGenerator:
 
         desks = resolve_desks(desk_keys)
         period_start, period_end = _period_bounds(period, end_date)
-        title = self._report_title(period, period_start, period_end, desks)
+        desk_label, report_type_label, date_range = self._report_title_parts(period, period_start, period_end, desks)
+        title = f"{desk_label} • {report_type_label} • {date_range}"
         sections: list[DeskReportSection] = []
 
         try:
@@ -141,6 +142,17 @@ class ReportGenerator:
             )
 
             paths = self.renderer.render_all(report)
+
+            from tech_desk.reports.report_docx import render_report_docx
+
+            try:
+                docx_path = render_report_docx(
+                    report, desk_label=desk_label, report_type_label=report_type_label, date_range=date_range,
+                )
+            except Exception:
+                logger.exception("Report docx rendering failed for report %s", title)
+                docx_path = None
+
             orm = ReportORM(
                 period=period,
                 title=title,
@@ -151,6 +163,7 @@ class ReportGenerator:
                 html_path=str(paths.get("html", "")),
                 markdown_path=str(paths.get("markdown", "")),
                 pdf_path=str(paths.get("pdf")) if paths.get("pdf") else None,
+                docx_path=str(docx_path) if docx_path else None,
                 custom_instructions=custom_instructions or None,
             )
             session.add(orm)
@@ -161,13 +174,13 @@ class ReportGenerator:
         finally:
             session.close()
 
-    def _report_title(
+    def _report_title_parts(
         self,
         period: ReportPeriod,
         start: datetime,
         end: datetime,
         desks: list[TechDeskDefinition],
-    ) -> str:
+    ) -> tuple[str, str, str]:
         labels = {"daily": "Daily Brief", "weekly": "Weekly Intelligence", "monthly": "Monthly Technology Desk Report"}
         date_range = f"{start.strftime('%b %d')} to {end.strftime('%b %d, %Y')}"
         if len(desks) == 1:
@@ -176,10 +189,7 @@ class ReportGenerator:
             desk_label = f"Gen AI ({', '.join(d.code for d in desks)})"
         else:
             desk_label = "Gen AI (All Desks)"
-        # Three bullet-separated segments (desk, report type, date range) so the
-        # UI can split this into separate table columns without parsing a
-        # free-form string. Avoid em dashes here on purpose.
-        return f"{desk_label} • {labels[period]} • {date_range}"
+        return desk_label, labels[period], date_range
 
     def _collect_vendor_notes(self, session, desk: TechDeskDefinition) -> dict[str, str]:
         """Recent analyst CRM notes per key vendor on this desk, for feeding

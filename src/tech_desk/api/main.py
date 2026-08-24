@@ -105,14 +105,6 @@ def _resolve_desk_keys(desk_ids: list[str] | None) -> list[str] | None:
     return desk_ids
 
 
-def _job_scope_key(period: str, desk_keys: list[str] | None) -> str:
-    """Identifies the 'scope' a research/report/pipeline job covers, so two
-    users triggering the same period+desks at once join the same job instead
-    of kicking off duplicate (expensive, LLM-billed) work."""
-    desks_part = ",".join(sorted(desk_keys)) if desk_keys else "all"
-    return f"{period}:{desks_part}"
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
@@ -386,15 +378,14 @@ async def run_research(req: RunResearchRequest):
     desk_keys = _resolve_desk_keys(req.desk_ids)
 
     if req.async_mode:
-        job_id, joined_existing = job_manager.submit(
+        job_id = job_manager.submit(
             "research",
             run_research_job,
-            key=_job_scope_key(req.period, desk_keys),
             period=req.period,
             desk_keys=desk_keys,
             custom_instructions=req.custom_instructions,
         )
-        return {"job_id": job_id, "status": "pending", "joined_existing": joined_existing}
+        return {"job_id": job_id, "status": "pending"}
 
     try:
         return run_research_job(period=req.period, desk_keys=desk_keys, custom_instructions=req.custom_instructions)
@@ -408,15 +399,14 @@ async def generate_report(req: GenerateReportRequest):
     desk_keys = _resolve_desk_keys(req.desk_ids)
 
     if req.async_mode:
-        job_id, joined_existing = job_manager.submit(
+        job_id = job_manager.submit(
             "report",
             run_report_job,
-            key=_job_scope_key(req.period, desk_keys),
             period=req.period,
             desk_keys=desk_keys,
             custom_instructions=req.custom_instructions,
         )
-        return {"job_id": job_id, "status": "pending", "joined_existing": joined_existing}
+        return {"job_id": job_id, "status": "pending"}
 
     try:
         return run_report_job(period=req.period, desk_keys=desk_keys, custom_instructions=req.custom_instructions)
@@ -430,15 +420,14 @@ async def run_full_pipeline(req: FullPipelineRequest):
     desk_keys = _resolve_desk_keys(req.desk_ids)
 
     if req.async_mode:
-        job_id, joined_existing = job_manager.submit(
+        job_id = job_manager.submit(
             "pipeline",
             run_pipeline_job,
-            key=_job_scope_key(req.period, desk_keys),
             period=req.period,
             desk_keys=desk_keys,
             custom_instructions=req.custom_instructions,
         )
-        return {"job_id": job_id, "status": "pending", "joined_existing": joined_existing}
+        return {"job_id": job_id, "status": "pending"}
 
     try:
         return run_pipeline_job(period=req.period, desk_keys=desk_keys, custom_instructions=req.custom_instructions)
@@ -549,6 +538,7 @@ async def list_reports(limit: int = 20, offset: int = 0, session: Session = Depe
                 "period_end": r.period_end.isoformat(),
                 "has_html": bool(r.html_path),
                 "has_pdf": bool(r.pdf_path),
+                "has_docx": bool(r.docx_path),
             }
             for r in reports
         ],
@@ -571,6 +561,7 @@ async def get_report(report_id: int, session: Session = Depends(get_db_session))
         "html_path": report.html_path,
         "markdown_path": report.markdown_path,
         "pdf_path": report.pdf_path,
+        "docx_path": report.docx_path,
     }
 
 
@@ -591,7 +582,7 @@ async def download_report(report_id: int, fmt: str, session: Session = Depends(g
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
-    path_map = {"html": report.html_path, "markdown": report.markdown_path, "md": report.markdown_path, "pdf": report.pdf_path}
+    path_map = {"html": report.html_path, "markdown": report.markdown_path, "md": report.markdown_path, "pdf": report.pdf_path, "docx": report.docx_path}
     path_str = path_map.get(fmt)
     if not path_str:
         raise HTTPException(status_code=400, detail=f"Unknown format: {fmt}")
@@ -600,7 +591,7 @@ async def download_report(report_id: int, fmt: str, session: Session = Depends(g
     if not path.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
-    media = {"html": "text/html", "markdown": "text/markdown", "md": "text/markdown", "pdf": "application/pdf"}
+    media = {"html": "text/html", "markdown": "text/markdown", "md": "text/markdown", "pdf": "application/pdf", "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
     return FileResponse(path, media_type=media.get(fmt, "application/octet-stream"), filename=path.name)
 
 

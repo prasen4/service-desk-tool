@@ -84,6 +84,7 @@ class ReportORM(Base):
     html_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     markdown_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     pdf_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    docx_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     custom_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 

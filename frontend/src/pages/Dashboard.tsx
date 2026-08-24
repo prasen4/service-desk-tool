@@ -179,6 +179,12 @@ export default function Dashboard() {
                     <a className="link" href={`/api/reports/${r.id}/html`} target="_blank" rel="noreferrer">
                       View
                     </a>
+                    {r.has_docx && (
+                      <>
+                        {" "}
+                        · <a className="link" href={`/api/reports/${r.id}/download/docx`}>DOCX</a>
+                      </>
+                    )}
                   </td>
                 </tr>
                 );

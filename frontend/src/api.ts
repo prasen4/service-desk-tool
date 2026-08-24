@@ -98,6 +98,7 @@ export interface ReportSummary {
   period_end: string;
   has_html: boolean;
   has_pdf: boolean;
+  has_docx: boolean;
   custom_instructions?: string | null;
 }
 
