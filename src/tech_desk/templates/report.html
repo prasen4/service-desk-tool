@@ -226,9 +226,28 @@
       border-top: 1px solid var(--border);
     }
     .footer strong { color: var(--purple); }
+    .report-search { margin-bottom: var(--space-6); }
+    .report-search input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      font-size: 15px;
+      font-family: inherit;
+      background: var(--card);
+      color: var(--text);
+      box-shadow: var(--shadow);
+    }
+    .report-search input:focus {
+      outline: none;
+      border-color: var(--soothing-violet);
+      box-shadow: 0 0 0 3px var(--purple-light);
+    }
+    .report-search-empty { color: var(--muted); margin-bottom: var(--space-6); }
     @media print {
       body { padding: 0; background: #FAF9FC; }
       .desk-section { border: 1px solid var(--border); box-shadow: none; }
+      .report-search, .report-search-empty { display: none !important; }
     }
   </style>
 </head>
@@ -280,6 +299,11 @@
       <p>{{ report.executive_summary }}</p>
     </div>
     {% endif %}
+
+    <div class="report-search">
+      <input type="text" id="reportSearchInput" placeholder="Search this report by vendor or update..." oninput="filterReport(this.value)">
+    </div>
+    <p id="reportSearchEmpty" class="report-search-empty" style="display:none;">No vendors or updates match your search.</p>
 
     {% for section in report.sections %}
     <div class="desk-section">
@@ -378,5 +402,19 @@
       <strong>Cotiviti</strong> — Technology Desk Intelligence &nbsp;|&nbsp; Confidential
     </div>
   </div>
+  <script>
+    function filterReport(query) {
+      var q = query.trim().toLowerCase();
+      var cards = document.querySelectorAll('.vendor-card, .update-card');
+      var visibleCount = 0;
+      cards.forEach(function (card) {
+        var show = !q || card.textContent.toLowerCase().indexOf(q) !== -1;
+        card.style.display = show ? '' : 'none';
+        if (show) visibleCount++;
+      });
+      var emptyMsg = document.getElementById('reportSearchEmpty');
+      if (emptyMsg) emptyMsg.style.display = (q && visibleCount === 0) ? '' : 'none';
+    }
+  </script>
 </body>
 </html>

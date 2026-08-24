@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PageIntro from "../components/PageIntro";
 import { api, type Desk, type Health, type ReportSummary, type ResearchRun } from "../api";
 import { formatDateTime, splitReportTitle } from "../utils";
 import { useJobActivity } from "../hooks/useJobActivity";
@@ -76,6 +77,10 @@ export default function Dashboard() {
       <p className="subtitle">
         Automated Gen AI technology briefs for Cotiviti's healthcare tech leadership
       </p>
+      <PageIntro id="dashboard">
+        Start here to run the full research-to-report pipeline in one click, check system status, and jump
+        into your most recent reports. Use the nav on the left for research, reports, updates, and vendors.
+      </PageIntro>
 
       {error && <p className="error-text" style={{ marginBottom: "var(--space-6)" }}>{error}</p>}
 

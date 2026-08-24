@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import PageIntro from "../components/PageIntro";
 import { api, type Desk, type VendorSummary, type VendorUpdatesResponse } from "../api";
 import { formatDate } from "../utils";
 
@@ -38,7 +39,10 @@ export default function Vendors() {
   }, []);
 
   const filtered = useMemo(
-    () => vendors.filter((v) => v.name.toLowerCase().includes(search.toLowerCase())),
+    () =>
+      vendors
+        .filter((v) => v.name.toLowerCase().includes(search.toLowerCase()))
+        .sort((a, b) => a.name.localeCompare(b.name)),
     [vendors, search]
   );
 
@@ -87,6 +91,11 @@ export default function Vendors() {
           {showAddVendor ? "Cancel" : "+ Add Vendor"}
         </button>
       </div>
+
+      <PageIntro id="vendors">
+        Every vendor tracked by a tech desk, plus any vendor research has discovered. Click one to see its
+        news, CRM notes, status, and generate an AI-drafted position paper.
+      </PageIntro>
 
       {showAddVendor && (
         <div className="panel" style={{ marginBottom: "var(--space-4)" }}>

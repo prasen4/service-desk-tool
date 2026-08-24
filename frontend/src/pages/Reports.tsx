@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PageIntro from "../components/PageIntro";
 import { api, type Desk, type ReportSummary } from "../api";
 import { formatDateTime, splitReportTitle } from "../utils";
 import { useJobActivity } from "../hooks/useJobActivity";
@@ -53,6 +54,10 @@ export default function Reports() {
     <div>
       <h1>Reports</h1>
       <p className="subtitle">Stakeholder-ready Cotiviti intelligence briefs</p>
+      <PageIntro id="reports">
+        Generate a daily, weekly, or monthly stakeholder brief for one or all tech desks, then download it
+        as HTML, PDF, Markdown, or a branded Word document.
+      </PageIntro>
       {error && <p className="error-text" style={{ marginBottom: "var(--space-4)" }}>{error}</p>}
       <div className="btn-group" style={{ marginBottom: "var(--space-3)", alignItems: "center" }}>
         <select className="inline-select" value={desk} onChange={(e) => setDesk(e.target.value)}>

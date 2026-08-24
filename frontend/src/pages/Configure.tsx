@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type Catalog, type ModelInfo } from "../api";
 import { money } from "../utils";
+import PageIntro from "../components/PageIntro";
 
 const HORIZON_LABEL: Record<string, string> = {
   daily: "daily brief",
@@ -122,6 +123,10 @@ export default function Configure() {
       <p className="subtitle">
         Choose a model provider and see the projected cost per brief. One API key runs everything.
       </p>
+      <PageIntro id="configure">
+        Set the LLM provider, model, and API key used for research and report generation, and preview
+        the estimated cost per brief before you run anything.
+      </PageIntro>
       <div className="llm-setup-grid">
         <div className="panel">
           <h2>Provider &amp; Credentials</h2>

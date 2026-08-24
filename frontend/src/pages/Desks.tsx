@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PageIntro from "../components/PageIntro";
 import { api, type Desk } from "../api";
 import { useJobActivity } from "../hooks/useJobActivity";
 
@@ -32,6 +33,10 @@ export default function Desks() {
     <div>
       <h1>Tech Desks</h1>
       <p className="subtitle">Gen AI monitoring categories aligned with RedCell Technical Prospecting</p>
+      <PageIntro id="desks">
+        Tech desks group vendors and research by focus area (Infrastructure, Models, Engineering Tools, and
+        so on). Every research run, update, and report is scoped to one or more of these desks.
+      </PageIntro>
       {loading ? (
         <div className="empty">Loading...</div>
       ) : (

@@ -1,6 +1,7 @@
 import { useJobActivity } from "../hooks/useJobActivity";
 import { formatDateTime } from "../utils";
 import type { Job } from "../api";
+import PageIntro from "../components/PageIntro";
 
 const KIND_LABEL: Record<string, string> = {
   pipeline: "Full pipeline",
@@ -28,6 +29,10 @@ export default function Activity() {
       <p className="subtitle">
         Live status of research, report, and pipeline jobs. This view updates automatically.
       </p>
+      <PageIntro id="activity">
+        This page shows every research run, report generation, and pipeline job in progress or recently
+        finished, so you can confirm a run started and watch it complete without leaving the page.
+      </PageIntro>
       <div className="panel">
         {!jobs.length ? (
           <div className="empty">No jobs yet. Run research or a pipeline to see activity here.</div>

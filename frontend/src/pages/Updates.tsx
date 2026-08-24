@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PageIntro from "../components/PageIntro";
 import { api, type Desk, type UpdateItem } from "../api";
 import { formatDate } from "../utils";
 
@@ -26,6 +27,10 @@ export default function Updates() {
     <div>
       <h1>Updates Feed</h1>
       <p className="subtitle">Curated technology updates with source links and dates</p>
+      <PageIntro id="updates">
+        Every update collected and curated by research runs, in one feed. Filter by tech desk to see what's
+        new for a specific focus area.
+      </PageIntro>
       <div className="form-group" style={{ maxWidth: 300, marginBottom: "var(--space-4)" }}>
         <label>Filter by Desk</label>
         <select value={desk} onChange={(e) => setDesk(e.target.value)}>

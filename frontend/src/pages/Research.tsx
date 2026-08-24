@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PageIntro from "../components/PageIntro";
 import { api, type Desk, type ResearchRun } from "../api";
 import { formatDateTime } from "../utils";
 import { useJobActivity } from "../hooks/useJobActivity";
@@ -57,6 +58,10 @@ export default function Research() {
         History of web research and AI curation runs. Vendors relevant to a desk's focus areas are
         discovered and tracked automatically, even if they weren't tracked before.
       </p>
+      <PageIntro id="research">
+        Kick off a research run to search the web, curate what's relevant with AI, and feed the results into
+        Updates and future reports. This page also shows the history of past runs.
+      </PageIntro>
       {error && <p className="error-text" style={{ marginBottom: "var(--space-4)" }}>{error}</p>}
       <div className="btn-group" style={{ marginBottom: "var(--space-3)", alignItems: "center" }}>
         <select className="inline-select" value={desk} onChange={(e) => setDesk(e.target.value)}>
