@@ -54,8 +54,8 @@ export default function Research() {
     <div>
       <h1>Research Runs</h1>
       <p className="subtitle">
-        Web research and AI curation history — research isn't limited to already-tracked vendors; newly discovered
-        vendors relevant to a desk's focus areas are automatically added to that desk's tracked list.
+        History of web research and AI curation runs. Vendors relevant to a desk's focus areas are
+        discovered and tracked automatically, even if they weren't tracked before.
       </p>
       {error && <p className="error-text" style={{ marginBottom: "var(--space-4)" }}>{error}</p>}
       <div className="btn-group" style={{ marginBottom: "var(--space-3)", alignItems: "center" }}>
@@ -63,7 +63,7 @@ export default function Research() {
           <option value="">All Desks</option>
           {desks.map((d) => (
             <option key={d.id} value={d.id}>
-              {d.code} — {d.name}
+              {d.code} · {d.name}
             </option>
           ))}
         </select>
@@ -118,7 +118,7 @@ export default function Research() {
                   </td>
                   <td>{r.desks_processed}</td>
                   <td>{r.updates_found}</td>
-                  <td>{r.vendors_added?.length ? r.vendors_added.join(", ") : "—"}</td>
+                  <td>{r.vendors_added?.length ? r.vendors_added.join(", ") : "None"}</td>
                 </tr>
               ))
             )}

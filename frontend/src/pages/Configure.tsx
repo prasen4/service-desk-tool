@@ -110,7 +110,7 @@ export default function Configure() {
     const monthly = runCost * runsPerMonth;
     const sourceNote = measured
       ? `Calibrated from ${measured.samples} actual run${measured.samples === 1 ? "" : "s"}`
-      : "Modeled estimate — run a pipeline to calibrate from real usage";
+      : "Modeled estimate. Run a pipeline to calibrate from real usage.";
     return { runIn, runOut, runInCost, runOutCost, runCost, perDeskCost, monthly, runsPerMonth, sourceNote, inPrice, outPrice };
   }, [catalog, currentModel, horizon, deskCount]);
 
@@ -120,8 +120,7 @@ export default function Configure() {
     <div>
       <h1>LLM Setup</h1>
       <p className="subtitle">
-        Choose your model provider and estimate what each brief cadence will cost — one API key is all you need
-        to run everything.
+        Choose a model provider and see the projected cost per brief. One API key runs everything.
       </p>
       <div className="llm-setup-grid">
         <div className="panel">
@@ -143,7 +142,7 @@ export default function Configure() {
               <select value={model} onChange={(e) => setModel(e.target.value)}>
                 {currentProvider.models.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.label} — ${m.input}/${m.output} per 1M
+                    {m.label} (${m.input}/${m.output} per 1M)
                   </option>
                 ))}
               </select>
@@ -280,7 +279,7 @@ export default function Configure() {
               <div className="cost-breakdown">
                 <div className="cost-row">
                   <span className="k">Model</span>
-                  <span className="v">{currentModel?.label || model || "—"}</span>
+                  <span className="v">{currentModel?.label || model || "Not set"}</span>
                 </div>
                 <div className="cost-row">
                   <span className="k">Input price</span>
@@ -309,7 +308,7 @@ export default function Configure() {
                 {!currentModel && (
                   <div className="cost-row">
                     <span className="k">Note</span>
-                    <span className="v">No list price for this model — set one via the API.</span>
+                    <span className="v">No list price for this model. Set one via the API.</span>
                   </div>
                 )}
               </div>

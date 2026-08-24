@@ -32,7 +32,7 @@ export default function Updates() {
           <option value="">All Desks</option>
           {desks.map((d) => (
             <option key={d.id} value={d.id}>
-              {d.code} — {d.name}
+              {d.code} · {d.name}
             </option>
           ))}
         </select>

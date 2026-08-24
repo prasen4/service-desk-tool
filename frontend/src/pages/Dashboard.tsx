@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type Desk, type Health, type ReportSummary, type ResearchRun } from "../api";
-import { formatDateTime } from "../utils";
+import { formatDateTime, splitReportTitle } from "../utils";
 import { useJobActivity } from "../hooks/useJobActivity";
 
 export default function Dashboard() {
@@ -72,7 +72,7 @@ export default function Dashboard() {
     <div>
       <h1>Dashboard</h1>
       <p className="subtitle">
-        Cotiviti Gen AI technology intelligence — automated briefs for healthcare tech leadership
+        Automated Gen AI technology briefs for Cotiviti's healthcare tech leadership
       </p>
 
       {error && <p className="error-text" style={{ marginBottom: "var(--space-6)" }}>{error}</p>}
@@ -97,7 +97,7 @@ export default function Dashboard() {
           </div>
           <div className="card">
             <div className="card-label">Last Run</div>
-            <div className="card-value small">{lastRun ? `${lastRun.updates_found} updates` : "—"}</div>
+            <div className="card-value small">{lastRun ? `${lastRun.updates_found} updates` : "No runs yet"}</div>
           </div>
         </div>
       )}
@@ -115,7 +115,7 @@ export default function Dashboard() {
               <option value="">All Desks</option>
               {desks.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.code} — {d.name}
+                  {d.code} · {d.name}
                 </option>
               ))}
             </select>
@@ -149,19 +149,21 @@ export default function Dashboard() {
           <table>
             <thead>
               <tr>
-                <th>Title</th>
-                <th>Period</th>
+                <th>Tech Desk</th>
+                <th>Report Type</th>
+                <th>Report Period</th>
                 <th>Generated</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {reports.map((r) => (
+              {reports.map((r) => {
+                const [deskLabel, reportType, reportPeriod] = splitReportTitle(r.title);
+                return (
                 <tr key={r.id}>
-                  <td>{r.title}</td>
-                  <td>
-                    <span className="badge badge-medium">{r.period}</span>
-                  </td>
+                  <td>{deskLabel}</td>
+                  <td>{reportType || <span className="badge badge-medium">{r.period}</span>}</td>
+                  <td>{reportPeriod}</td>
                   <td>{formatDateTime(r.generated_at)}</td>
                   <td>
                     <a className="link" href={`/api/reports/${r.id}/html`} target="_blank" rel="noreferrer">
@@ -169,7 +171,8 @@ export default function Dashboard() {
                     </a>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}

@@ -160,7 +160,7 @@ export default function VendorProfile() {
     return (
       <div>
         <Link className="link" to="/vendors">
-          ← Back to Vendor News
+          ← Back to Vendors
         </Link>
         <div className="empty">{error || "Vendor not found."}</div>
       </div>
@@ -170,7 +170,7 @@ export default function VendorProfile() {
   return (
     <div>
       <Link className="link" to="/vendors">
-        ← Back to Vendor News
+        ← Back to Vendors
       </Link>
       <div className="profile-header">
         <div>

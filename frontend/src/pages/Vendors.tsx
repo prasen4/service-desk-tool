@@ -63,7 +63,7 @@ export default function Vendors() {
       await api.post(`/api/desks/${encodeURIComponent(newVendorDesk)}/vendors`, { vendor: newVendorName.trim() });
       const deskName = desks.find((d) => d.id === newVendorDesk)?.name || newVendorDesk;
       setAddVendorSuccess(
-        `"${newVendorName.trim()}" is now tracked on ${deskName} — it will automatically appear in Vendor News, research runs, and reports.`
+        `"${newVendorName.trim()}" is now tracked on ${deskName}. It will appear in Vendors, research runs, and reports.`
       );
       setNewVendorName("");
       await loadVendors();
@@ -78,9 +78,9 @@ export default function Vendors() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "var(--space-3)" }}>
         <div>
-          <h1>Vendor News</h1>
+          <h1>Vendors</h1>
           <p className="subtitle">
-            Running feed of curated updates by vendor — click a vendor to see latest news tagged by tech desk
+            Curated updates by vendor. Click a vendor to see its latest news by tech desk.
           </p>
         </div>
         <button className="btn btn-outline btn-sm" onClick={() => setShowAddVendor((v) => !v)}>
@@ -92,8 +92,8 @@ export default function Vendors() {
         <div className="panel" style={{ marginBottom: "var(--space-4)" }}>
           <h2>Add a Vendor</h2>
           <p className="sub">
-            Adding a vendor tracks it on a tech desk — it will automatically propagate to research (vendor-targeted
-            search queries), Vendor News, and future reports. No restart required.
+            Adding a vendor tracks it on a tech desk. It flows automatically into research (vendor-targeted
+            search queries), Vendors, and future reports. No restart required.
           </p>
           <form onSubmit={submitNewVendor}>
             <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "flex-end" }}>

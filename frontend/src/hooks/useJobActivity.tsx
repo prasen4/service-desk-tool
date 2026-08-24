@@ -75,7 +75,7 @@ export function JobActivityProvider({ children }: { children: ReactNode }) {
         if (joined_existing) {
           setStatusBar({
             title: "Already running",
-            msg: "Someone already started this — tracking their run instead of starting a duplicate.",
+            msg: "Someone already started this run. Tracking it instead of starting a duplicate.",
             progress: 5,
           });
         }

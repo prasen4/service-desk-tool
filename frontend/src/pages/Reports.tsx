@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type Desk, type ReportSummary } from "../api";
-import { formatDateTime } from "../utils";
+import { formatDateTime, splitReportTitle } from "../utils";
 import { useJobActivity } from "../hooks/useJobActivity";
 
 export default function Reports() {
@@ -59,7 +59,7 @@ export default function Reports() {
           <option value="">All Desks</option>
           {desks.map((d) => (
             <option key={d.id} value={d.id}>
-              {d.code} — {d.name}
+              {d.code} · {d.name}
             </option>
           ))}
         </select>
@@ -84,8 +84,9 @@ export default function Reports() {
         <table>
           <thead>
             <tr>
-              <th>Title</th>
-              <th>Period</th>
+              <th>Tech Desk</th>
+              <th>Report Type</th>
+              <th>Report Period</th>
               <th>Generated</th>
               <th>Actions</th>
             </tr>
@@ -93,23 +94,24 @@ export default function Reports() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4} className="empty">
+                <td colSpan={5} className="empty">
                   Loading...
                 </td>
               </tr>
             ) : !reports.length ? (
               <tr>
-                <td colSpan={4} className="empty">
+                <td colSpan={5} className="empty">
                   No reports yet
                 </td>
               </tr>
             ) : (
-              reports.map((r) => (
+              reports.map((r) => {
+                const [deskLabel, reportType, reportPeriod] = splitReportTitle(r.title);
+                return (
                 <tr key={r.id}>
-                  <td>{r.title}</td>
-                  <td>
-                    <span className="badge badge-medium">{r.period}</span>
-                  </td>
+                  <td>{deskLabel}</td>
+                  <td>{reportType || <span className="badge badge-medium">{r.period}</span>}</td>
+                  <td>{reportPeriod}</td>
                   <td>{formatDateTime(r.generated_at)}</td>
                   <td>
                     <a className="link" href={`/api/reports/${r.id}/html`} target="_blank" rel="noreferrer">
@@ -124,7 +126,8 @@ export default function Reports() {
                     · <a className="link" href={`/api/reports/${r.id}/download/markdown`}>MD</a>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

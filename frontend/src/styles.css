@@ -27,6 +27,14 @@ body {
   flex-direction: column;
 }
 .logo { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.logo-mark {
+  height: 22px;
+  width: auto;
+  display: block;
+  background: #ffffff;
+  padding: 5px 10px;
+  border-radius: 8px;
+}
 .logo-sub {
   font-size: var(--h6-size); line-height: var(--h6-line);
   opacity: 0.7; margin-bottom: var(--space-12);

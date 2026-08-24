@@ -171,11 +171,15 @@ class ReportGenerator:
         labels = {"daily": "Daily Brief", "weekly": "Weekly Intelligence", "monthly": "Monthly Technology Desk Report"}
         date_range = f"{start.strftime('%b %d')} to {end.strftime('%b %d, %Y')}"
         if len(desks) == 1:
-            return f"{desks[0].name} — {labels[period]} — {date_range}"
-        if len(desks) < len(list_desk_definitions()):
-            codes = ", ".join(d.code for d in desks)
-            return f"Gen AI {labels[period]} ({codes}) — {date_range}"
-        return f"Gen AI {labels[period]} — {date_range}"
+            desk_label = desks[0].name
+        elif len(desks) < len(list_desk_definitions()):
+            desk_label = f"Gen AI ({', '.join(d.code for d in desks)})"
+        else:
+            desk_label = "Gen AI (All Desks)"
+        # Three bullet-separated segments (desk, report type, date range) so the
+        # UI can split this into separate table columns without parsing a
+        # free-form string. Avoid em dashes here on purpose.
+        return f"{desk_label} • {labels[period]} • {date_range}"
 
     def _collect_vendor_notes(self, session, desk: TechDeskDefinition) -> dict[str, str]:
         """Recent analyst CRM notes per key vendor on this desk, for feeding

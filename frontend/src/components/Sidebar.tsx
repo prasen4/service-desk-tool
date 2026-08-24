@@ -2,13 +2,14 @@ import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useTheme } from "../hooks/useTheme";
 import { useJobActivity } from "../hooks/useJobActivity";
+import cotivitiLogo from "../assets/cotiviti-logo.svg";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/research", label: "Research" },
   { to: "/reports", label: "Reports" },
   { to: "/updates", label: "Updates Feed" },
-  { to: "/vendors", label: "Vendor News" },
+  { to: "/vendors", label: "Vendors" },
   { to: "/desks", label: "Tech Desks" },
 ];
 
@@ -27,11 +28,7 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="logo">
-        <svg viewBox="0 0 130 32" height="30" xmlns="http://www.w3.org/2000/svg">
-          <text x="0" y="23" fontFamily="Nunito Sans, Arial, sans-serif" fontSize="18" fontWeight="800" fill="#F6F6F7">
-            cotiviti
-          </text>
-        </svg>
+        <img src={cotivitiLogo} alt="Cotiviti" className="logo-mark" />
       </div>
       <div className="logo-sub">Technology Desk Intelligence</div>
       <nav className="nav-list">
