@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [pipelineDesk, setPipelineDesk] = useState("");
   const [pipelinePeriod, setPipelinePeriod] = useState("daily");
+  const [pipelineInstructions, setPipelineInstructions] = useState("");
   const [running, setRunning] = useState(false);
   const { runJob } = useJobActivity();
 
@@ -45,6 +46,7 @@ export default function Dashboard() {
     setRunning(true);
     const payload: Record<string, unknown> = { period: pipelinePeriod };
     if (pipelineDesk) payload.desk_ids = [pipelineDesk];
+    if (pipelineInstructions.trim()) payload.custom_instructions = pipelineInstructions.trim();
     // Fire the job off and track its completion separately from the button's
     // disabled state — the backend dedupes concurrent requests for the SAME
     // scope (period + desk) by joining the existing job, but different
@@ -128,6 +130,14 @@ export default function Dashboard() {
               <option value="monthly">Monthly Report</option>
             </select>
           </div>
+        </div>
+        <div className="form-group" style={{ marginBottom: "var(--space-4)", maxWidth: 600 }}>
+          <label>Custom instructions (optional)</label>
+          <textarea
+            value={pipelineInstructions}
+            onChange={(e) => setPipelineInstructions(e.target.value)}
+            placeholder="e.g. Emphasize competitive positioning vs. incumbents this run."
+          />
         </div>
         <div className="btn-group">
           <button className="btn btn-accent" disabled={running} onClick={runPipeline}>
