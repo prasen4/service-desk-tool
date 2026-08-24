@@ -20,9 +20,13 @@ services:
 
   tech-desk:
     build: .
-    # Bind to localhost only; put nginx (see deploy/nginx.conf) in front for TLS/auth.
+    # Bound to all interfaces so an internal ALB (in another subnet) can reach
+    # this instance directly on 8080 and terminate TLS itself — see
+    # deploy/nginx.conf's header comment for the (now unused) nginx-in-front
+    # alternative. Lock this down at the EC2 security-group level: only allow
+    # inbound :8080 from the ALB's security group, never 0.0.0.0/0.
     ports:
-      - "127.0.0.1:8080:8080"
+      - "8080:8080"
     env_file:
       - .env
     environment:
