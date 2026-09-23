@@ -44,7 +44,24 @@ def render_report_docx(
     )
 
     theme.add_heading(doc, "Executive Summary")
-    theme.add_body(doc, report.executive_summary, empty_text="No significant developments this period.")
+    if report.executive_summary_sections:
+        es = report.executive_summary_sections
+        if es.overview:
+            theme.add_heading(doc, "High-Level Overview", level=2)
+            theme.add_body(doc, es.overview)
+        if es.clearest_signal:
+            theme.add_heading(doc, "Clearest Signal for Cotiviti", level=2)
+            theme.add_body(doc, es.clearest_signal)
+        if es.implications:
+            theme.add_heading(doc, "Implications for Cotiviti", level=2)
+            theme.add_body(doc, es.implications)
+        if es.vendors_mentioned:
+            theme.add_heading(doc, "Vendors Mentioned", level=2)
+            theme.add_body(doc, ", ".join(es.vendors_mentioned))
+        if not any([es.overview, es.clearest_signal, es.implications]):
+            theme.add_body(doc, "", empty_text="No significant developments this period.")
+    else:
+        theme.add_body(doc, report.executive_summary, empty_text="No significant developments this period.")
 
     for section in report.sections:
         heading = f"{section.desk_name} (Priority Desk)" if section.priority else section.desk_name

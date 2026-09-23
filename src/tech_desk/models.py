@@ -167,6 +167,16 @@ class DeskReportSection(BaseModel):
     sub_area_coverage: dict[str, list[str]] = Field(default_factory=dict)
 
 
+class ExecutiveSummarySections(BaseModel):
+    """Structured breakdown of the top-level executive summary so it reads as
+    scannable headers instead of one dense paragraph."""
+
+    overview: str = ""
+    clearest_signal: str = ""
+    implications: str = ""
+    vendors_mentioned: list[str] = Field(default_factory=list)
+
+
 class GeneratedReport(BaseModel):
     id: str | None = None
     period: str
@@ -175,6 +185,7 @@ class GeneratedReport(BaseModel):
     period_start: datetime
     period_end: datetime
     executive_summary: str = ""
+    executive_summary_sections: ExecutiveSummarySections | None = None
     sections: list[DeskReportSection] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 

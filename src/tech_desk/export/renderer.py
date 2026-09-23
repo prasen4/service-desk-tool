@@ -90,7 +90,19 @@ class ReportRenderer:
             "",
         ]
 
-        if report.executive_summary:
+        if report.executive_summary_sections:
+            es = report.executive_summary_sections
+            lines.extend(["## Executive Summary", ""])
+            if es.overview:
+                lines.extend(["### High-Level Overview", "", es.overview, ""])
+            if es.clearest_signal:
+                lines.extend(["### Clearest Signal for Cotiviti", "", es.clearest_signal, ""])
+            if es.implications:
+                lines.extend(["### Implications for Cotiviti", "", es.implications, ""])
+            if es.vendors_mentioned:
+                lines.extend(["### Vendors Mentioned", "", ", ".join(es.vendors_mentioned), ""])
+            lines.extend(["---", ""])
+        elif report.executive_summary:
             lines.extend(["## Executive Summary", "", report.executive_summary, "", "---", ""])
 
         for section in report.sections:

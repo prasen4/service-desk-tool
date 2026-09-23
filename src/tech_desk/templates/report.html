@@ -107,6 +107,13 @@
       text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;
     }
     .exec-summary p { font-size: 17px; line-height: 1.55; }
+    .exec-summary-label {
+      font-size: 13px; line-height: 1.4; color: var(--purple); margin-top: var(--space-4); margin-bottom: var(--space-1);
+      text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;
+    }
+    .exec-summary-label:first-of-type { margin-top: var(--space-2); }
+    .exec-summary-vendors { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    .badge-vendor { background: var(--purple-light); color: var(--purple); }
     .desk-section {
       background: var(--card);
       border: 1px solid var(--border);
@@ -159,7 +166,7 @@
       border: 1px solid var(--border);
     }
     .update-body { flex: 1; min-width: 0; }
-    .update-card h4 { font-size: 18px; font-weight: 700; margin-bottom: var(--space-2); line-height: 1.3; }
+    .update-card h4 { font-size: 19px; font-weight: 800; color: var(--deep-purple); margin-bottom: var(--space-2); line-height: 1.3; }
     .update-meta { font-size: 14px; color: var(--muted); margin-bottom: var(--space-2); }
     .relevance-high { color: var(--danger); font-weight: 700; }
     .relevance-medium { color: var(--warning); font-weight: 700; }
@@ -215,6 +222,7 @@
     .activity-low { background: var(--link-bg); color: var(--link); }
     .activity-none { background: #EDEDEF; color: var(--muted); }
     .vendor-trend { font-size: 17px; margin-bottom: var(--space-2); }
+    .vendor-top-story { font-size: 16px; font-weight: 700; color: var(--deep-purple); margin-bottom: var(--space-2); }
     .compact .vendor-card { padding: var(--space-3) var(--space-4); }
     .compact .update-card { padding: var(--space-3); }
     .footer {
@@ -261,7 +269,7 @@
       <h4>{{ u.title }}</h4>
       <div class="update-meta">
         {{ (u.published_date or u.discovered_at).strftime('%Y-%m-%d') }} &nbsp;|&nbsp;
-        <span class="relevance-{{ u.relevance.value }}">{{ u.relevance.value|upper }}</span>
+        <span class="relevance-{{ u.relevance.value }}">Relevance: {{ u.relevance.value|upper }}</span>
         &nbsp;|&nbsp; {{ u.source_name or 'Source' }}
       </div>
       {% if u.key_takeaways %}
@@ -293,7 +301,29 @@
       </div>
     </div>
 
-    {% if report.executive_summary %}
+    {% if report.executive_summary_sections %}
+    <div class="exec-summary">
+      <h2>Executive Summary</h2>
+      {% if report.executive_summary_sections.overview %}
+      <h3 class="exec-summary-label">High-Level Overview</h3>
+      <p>{{ report.executive_summary_sections.overview }}</p>
+      {% endif %}
+      {% if report.executive_summary_sections.clearest_signal %}
+      <h3 class="exec-summary-label">Clearest Signal for Cotiviti</h3>
+      <p>{{ report.executive_summary_sections.clearest_signal }}</p>
+      {% endif %}
+      {% if report.executive_summary_sections.implications %}
+      <h3 class="exec-summary-label">Implications for Cotiviti</h3>
+      <p>{{ report.executive_summary_sections.implications }}</p>
+      {% endif %}
+      {% if report.executive_summary_sections.vendors_mentioned %}
+      <h3 class="exec-summary-label">Vendors Mentioned</h3>
+      <p class="exec-summary-vendors">
+        {% for v in report.executive_summary_sections.vendors_mentioned %}<span class="badge badge-vendor">{{ v }}</span>{% endfor %}
+      </p>
+      {% endif %}
+    </div>
+    {% elif report.executive_summary %}
     <div class="exec-summary">
       <h2>Executive Summary</h2>
       <p>{{ report.executive_summary }}</p>
@@ -336,8 +366,11 @@
             {% if vs.image_url %}
             <img class="vendor-logo" src="{{ vs.image_url }}" alt="{{ vs.vendor }}" onerror="this.style.display='none'">
             {% endif %}
-            <h4>{{ vs.vendor }} <span class="badge activity-{{ vs.activity_level }}">{{ vs.activity_level|upper }}</span></h4>
+            <h4>{{ vs.vendor }} <span class="badge activity-{{ vs.activity_level }}">Activity: {{ vs.activity_level|upper }}</span></h4>
           </div>
+          {% if vs.updates %}
+          <p class="vendor-top-story">{{ vs.updates[0].title }}</p>
+          {% endif %}
           {% if vs.trend_summary %}
           <p class="vendor-trend">{{ vs.trend_summary }}</p>
           {% endif %}

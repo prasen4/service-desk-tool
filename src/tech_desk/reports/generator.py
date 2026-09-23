@@ -13,6 +13,7 @@ from tech_desk.llm import LLMClient
 from tech_desk.models import (
     CuratedUpdate,
     DeskReportSection,
+    ExecutiveSummarySections,
     GeneratedReport,
     RelevanceLevel,
     TechDeskDefinition,
@@ -119,7 +120,7 @@ class ReportGenerator:
                 )
                 sections.append(section)
 
-            executive_summary = self._build_executive_summary(
+            executive_summary, executive_summary_sections = self._build_executive_summary(
                 period, sections, reporting_cfg, desks, custom_instructions=custom_instructions,
             )
 
@@ -130,6 +131,7 @@ class ReportGenerator:
                 period_start=period_start,
                 period_end=period_end,
                 executive_summary=executive_summary,
+                executive_summary_sections=executive_summary_sections,
                 sections=sections,
                 metadata={
                     "organization": config.get("organization", "Cotiviti"),
@@ -362,9 +364,9 @@ Respond in JSON:
         desks: list[TechDeskDefinition],
         *,
         custom_instructions: str = "",
-    ) -> str:
+    ) -> tuple[str, ExecutiveSummarySections | None]:
         if not cfg.get("include_executive_summary", True):
-            return ""
+            return "", None
 
         focus_sections = sections
         if len(desks) > 1:
@@ -375,30 +377,53 @@ Respond in JSON:
             f"- {s.desk_name}: {s.executive_summary or 'No updates'}" for s in focus_sections
         )
         instructions_block = f"\nAdditional guidance for this run: {custom_instructions}\n" if custom_instructions else ""
+        desk_ref = f'the "{desks[0].name}" desk' if len(desks) == 1 else "these tech desks"
+        sentence_guidance = "1 sentence per field" if period == "daily" else "1-2 sentences per field"
 
-        if len(desks) == 1:
-            sentences = "2-3 sentences" if period == "daily" else "4-6 sentences"
-            prompt = f"""Write a {period} executive summary ({sentences}) for Cotiviti leadership on the "{desks[0].name}" desk.
-Focus on what matters for Cotiviti's healthcare analytics mission.
-{instructions_block}
-Desk summary:
-{digest}
-
-Write only the paragraph, no JSON."""
-        else:
-            sentences = "2-3 sentences" if period == "daily" else "4-6 sentences"
-            prompt = f"""Write a {period} executive summary ({sentences}) for Cotiviti leadership.
-Lead with the most strategically significant vendor developments.
+        prompt = f"""Write a {period} executive summary for Cotiviti leadership on {desk_ref}.
+Focus on what matters for Cotiviti's healthcare analytics mission. Lead with the most
+strategically significant vendor developments. Use {sentence_guidance}.
 {instructions_block}
 Desk summaries:
 {digest}
 
-Write only the paragraph, no JSON."""
+Respond in JSON:
+{{
+  "overview": "high-level summary of what happened this period, across all desks covered",
+  "clearest_signal": "the single most important/strategically significant development, and why it stands out",
+  "implications": "what this means for Cotiviti specifically — action-oriented, so-what framing"
+}}"""
+
+        vendors_mentioned = self._vendors_mentioned(sections)
 
         try:
-            return self.llm.chat(REPORT_SYSTEM_PROMPT, prompt, temperature=0.4, max_tokens=800)
+            data = self.llm.chat_json(REPORT_SYSTEM_PROMPT, prompt, temperature=0.4, max_tokens=800)
+            structured = ExecutiveSummarySections(
+                overview=data.get("overview", ""),
+                clearest_signal=data.get("clearest_signal", ""),
+                implications=data.get("implications", ""),
+                vendors_mentioned=vendors_mentioned,
+            )
         except Exception:
-            return digest
+            structured = ExecutiveSummarySections(overview=digest, vendors_mentioned=vendors_mentioned)
+
+        flat_text = " ".join(
+            part for part in (structured.overview, structured.clearest_signal, structured.implications) if part
+        )
+        return flat_text, structured
+
+    @staticmethod
+    def _vendors_mentioned(sections: list[DeskReportSection]) -> list[str]:
+        """Vendors with actual activity this period, in first-seen order,
+        for the executive summary's "Vendors Mentioned" list. Derived
+        directly from the report content rather than the LLM so it can never
+        name a vendor that isn't actually in the report."""
+        seen: list[str] = []
+        for section in sections:
+            for vs in section.vendor_sections:
+                if vs.vendor not in seen and (vs.activity_level != "none" or vs.updates):
+                    seen.append(vs.vendor)
+        return seen
 
     def _format_updates_for_llm(self, updates: list[CuratedUpdate]) -> str:
         lines = []
