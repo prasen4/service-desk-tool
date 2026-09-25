@@ -56,6 +56,36 @@ def _slugify(name: str) -> str:
     return slug or "vendor"
 
 
+# Attachment types we can pull excerpt text from for LLM context. (Other
+# allowed upload types -- images, .doc, .ppt/.pptx, .xls/.xlsx -- have no
+# lightweight text-extraction path here and are skipped.)
+PARSEABLE_ATTACHMENT_EXTENSIONS = {".txt", ".md", ".csv", ".pdf", ".docx"}
+
+
+def _extract_attachment_text(path: Path, ext: str, max_chars: int = 1500) -> str | None:
+    """Best-effort plain-text excerpt from an attachment for use as LLM
+    context. Returns None (skipped, not an error) if the file can't be parsed
+    -- a corrupt/unusual upload should never break position paper generation."""
+    try:
+        if ext in (".txt", ".md", ".csv"):
+            return path.read_text(encoding="utf-8", errors="ignore")[:max_chars] or None
+        if ext == ".pdf":
+            from pypdf import PdfReader
+
+            reader = PdfReader(str(path))
+            text = "\n".join((page.extract_text() or "") for page in reader.pages)
+            return text.strip()[:max_chars] or None
+        if ext == ".docx":
+            from docx import Document
+
+            doc = Document(str(path))
+            text = "\n".join(p.text for p in doc.paragraphs)
+            return text.strip()[:max_chars] or None
+    except Exception:
+        logger.warning("Failed to extract text from attachment (%s)", ext, exc_info=True)
+    return None
+
+
 def _gather_internal_context(session, vendor_name: str) -> str:
     """Pull CRM notes, status, attachment excerpts, and recent curated updates
     for this vendor into a single text block for the LLM prompt."""
@@ -74,20 +104,20 @@ def _gather_internal_context(session, vendor_name: str) -> str:
                 author = f" ({n['author']})" if n.get("author") else ""
                 parts.append(f"- [{n['created_at'][:10]}]{author} {n['body']}")
         attachments = profile.get("attachments") or []
-        text_attachments = [a for a in attachments if a["filename"].lower().endswith(".txt")]
-        if text_attachments:
+        parseable_attachments = [
+            a for a in attachments if Path(a["filename"]).suffix.lower() in PARSEABLE_ATTACHMENT_EXTENSIONS
+        ]
+        if parseable_attachments:
             parts.append("Attachment excerpts:")
-            for a in text_attachments[:5]:
+            for a in parseable_attachments[:5]:
                 attachment_orm = vendor_profiles.get_attachment(session, vendor_name, a["id"])
                 if attachment_orm is None:
                     continue
                 path = vendor_profiles.attachment_path(attachment_orm)
                 if path.exists():
-                    try:
-                        excerpt = path.read_text(encoding="utf-8", errors="ignore")[:1500]
+                    excerpt = _extract_attachment_text(path, Path(a["filename"]).suffix.lower())
+                    if excerpt:
                         parts.append(f"- {a['filename']}: {excerpt}")
-                    except OSError:
-                        pass
 
     news = get_vendor_updates(session, vendor_name, limit=15)
     if news and news.get("updates"):
