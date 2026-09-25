@@ -12,6 +12,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       ? options.headers
       : { "Content-Type": "application/json", ...(options.headers || {}) },
   });
+  if (res.status === 401) {
+    // Session expired/missing (Okta login enabled) — bounce to the login flow.
+    window.location.href = "/api/auth/login";
+    throw new ApiError("Login required");
+  }
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -37,6 +42,12 @@ export const api = {
 };
 
 // —— Types (loose but useful — mirrors the FastAPI response shapes) ——
+
+export interface AuthStatus {
+  enabled: boolean;
+  logged_in: boolean;
+  user: Record<string, unknown> | null;
+}
 
 export interface Health {
   status: string;

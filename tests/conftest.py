@@ -18,6 +18,10 @@ os.environ.setdefault("TECH_DESK_DATA_DIR", _TEST_DATA_DIR)
 os.environ.setdefault("OPENAI_API_KEY", "sk-test-dummy-key-000000000000")
 os.environ.setdefault("ENV", "test")
 os.environ.setdefault("SCHEDULER_ENABLED", "false")
+# Force auth off for the test suite regardless of the developer's local .env
+# (env vars take priority over .env file values in pydantic-settings), so
+# testing live Okta login locally never breaks the test suite.
+os.environ["AUTH_ENABLED"] = "false"
 
 
 @atexit.register

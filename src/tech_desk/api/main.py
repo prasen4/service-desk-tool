@@ -9,14 +9,14 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from tech_desk import __version__
-from tech_desk.api.auth_routes import router as auth_router
+from tech_desk.api.auth_routes import SESSION_COOKIE, router as auth_router
 from tech_desk.api.jobs import job_manager
 from tech_desk.api.rate_limit import configure_limiter, pipeline_limiter, rate_limit
 from tech_desk.api.services import run_pipeline_job, run_report_job, run_research_job
@@ -151,6 +151,35 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Public paths that stay reachable even when AUTH_ENABLED=true — the login
+# flow itself, health checks (used by load balancers/orchestrators), and the
+# static assets needed to render the app shell before redirecting to login.
+_PUBLIC_PATH_PREFIXES = ("/api/auth", "/api/health", "/api/ready", "/assets", "/static", "/favicon.ico")
+
+
+@app.middleware("http")
+async def enforce_login(request: Request, call_next):
+    """No-op unless AUTH_ENABLED=true (the default). When enabled, requires a
+    valid Okta session cookie for everything except `_PUBLIC_PATH_PREFIXES`;
+    API requests get a 401 JSON response, browser navigation gets redirected
+    to the Okta login flow."""
+    settings = get_settings()
+    if not settings.auth_enabled or request.url.path.startswith(_PUBLIC_PATH_PREFIXES):
+        return await call_next(request)
+
+    from tech_desk.integrations import okta_auth
+
+    cookie = request.cookies.get(SESSION_COOKIE)
+    user = okta_auth.verify_session_cookie(cookie) if cookie else None
+    if user is None:
+        if request.url.path.startswith("/api/"):
+            return JSONResponse(status_code=401, content={"detail": "Login required."})
+        return RedirectResponse("/api/auth/login")
+
+    request.state.user = user
+    return await call_next(request)
+
 
 if WEB_DIST_DIR.exists():
     # Built React frontend takes priority once `npm run build` has been run

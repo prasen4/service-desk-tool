@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useTheme } from "../hooks/useTheme";
 import { useJobActivity } from "../hooks/useJobActivity";
+import { useAuthStatus } from "../hooks/useAuthStatus";
 import cotivitiLogo from "../assets/cotiviti-logo.svg";
 
 const NAV_ITEMS = [
@@ -24,6 +25,7 @@ export default function Sidebar() {
   const location = useLocation();
   const settingsActive = SETTINGS_ITEMS.some((item) => location.pathname.startsWith(item.to));
   const [settingsOpen, setSettingsOpen] = useState(settingsActive);
+  const authStatus = useAuthStatus();
 
   return (
     <aside className="sidebar">
@@ -81,6 +83,16 @@ export default function Sidebar() {
           onClick={toggleTheme}
         />
       </div>
+      {authStatus.enabled && authStatus.logged_in && (
+        <div className="theme-toggle" style={{ flexDirection: "column", alignItems: "stretch", gap: 6 }}>
+          <span className="label" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {String((authStatus.user?.name as string) || (authStatus.user?.email as string) || "Signed in")}
+          </span>
+          <a href="/api/auth/logout" onClick={(e) => { e.preventDefault(); fetch("/api/auth/logout", { method: "POST" }).then(() => (window.location.href = "/")); }}>
+            Sign out
+          </a>
+        </div>
+      )}
     </aside>
   );
 }
