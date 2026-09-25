@@ -80,6 +80,29 @@ def _get_client_context():
     return ClientContext(settings.sharepoint_site_url).with_access_token(_acquire_token)
 
 
+def _to_server_relative_path(path: str) -> str:
+    """SharePoint's REST API expects "server-relative" paths — relative to the
+    *domain* root (e.g. `/sites/TechDesk/Shared Documents`) — not the friendlier
+    site-relative paths most users think in terms of (e.g. `Shared Documents`).
+    Passing the latter directly to `get_folder_by_server_relative_url` silently
+    resolves against the wrong site (or a non-existent path), and the
+    underlying library often surfaces that as an opaque
+    `'str' object has no attribute 'get'` error instead of a clear 404/403.
+
+    This prepends the configured site's path segment (parsed from
+    `SHAREPOINT_SITE_URL`) if the given path doesn't already include it, so
+    callers/users can keep using the friendlier site-relative form.
+    """
+    settings = get_settings()
+    site_path = urlparse(settings.sharepoint_site_url).path.strip("/")  # e.g. "sites/TechDesk"
+    path = path.strip("/")
+    if not site_path:
+        return path
+    if path == site_path or path.startswith(site_path + "/"):
+        return path
+    return f"{site_path}/{path}" if path else site_path
+
+
 def upload_file(folder_relative_path: str, filename: str, content: bytes) -> str:
     """Uploads `content` as `filename` into
     `<SHAREPOINT_REPORTS_FOLDER>/<folder_relative_path>` (folders are created
@@ -90,11 +113,13 @@ def upload_file(folder_relative_path: str, filename: str, content: bytes) -> str
     target_folder_url = "/".join(
         part.strip("/") for part in (settings.sharepoint_reports_folder, folder_relative_path) if part
     )
+    target_folder_url = _to_server_relative_path(target_folder_url)
     try:
         folder = ctx.web.ensure_folder_path(target_folder_url).execute_query()
         uploaded = folder.upload_file(filename, content).execute_query()
         return uploaded.serverRelativeUrl
     except Exception as exc:
+        logger.exception("SharePoint upload failed for %s at %s", filename, target_folder_url)
         raise SharePointError(f"SharePoint upload failed for {filename}: {exc}") from exc
 
 
@@ -105,11 +130,13 @@ def list_files(folder_relative_path: str = "") -> list[dict]:
     target_folder_url = "/".join(
         part.strip("/") for part in (settings.sharepoint_reports_folder, folder_relative_path) if part
     )
+    target_folder_url = _to_server_relative_path(target_folder_url)
     try:
         folder = ctx.web.get_folder_by_server_relative_url(target_folder_url)
         files = folder.files.get().execute_query()
         return [{"name": f.name, "url": f.serverRelativeUrl, "size": f.length} for f in files]
     except Exception as exc:
+        logger.exception("SharePoint list failed for %s", target_folder_url)
         raise SharePointError(f"SharePoint list failed for {target_folder_url}: {exc}") from exc
 
 
@@ -120,7 +147,7 @@ def list_folder(folder_path: str) -> list[dict]:
     existing vendor documents (position papers, notes, etc.) into the CRM.
     """
     ctx = _get_client_context()
-    folder_path = folder_path.strip("/")
+    folder_path = _to_server_relative_path(folder_path)
     try:
         folder = ctx.web.get_folder_by_server_relative_url(folder_path)
         folder.expand(["Folders", "Files"]).get().execute_query()
@@ -133,6 +160,7 @@ def list_folder(folder_path: str) -> list[dict]:
         ]
         return entries
     except Exception as exc:
+        logger.exception("SharePoint browse failed for '%s'", folder_path or "/")
         raise SharePointError(f"SharePoint browse failed for '{folder_path or '/'}': {exc}") from exc
 
 
