@@ -165,6 +165,7 @@ class PositionPaperGenerator:
 
             orm.status = "completed"
             orm.docx_path = str(docx_path)
+            orm.sharepoint_url = self._upload_to_sharepoint(vendor_name, docx_path)
             orm.generated_at = now_utc()
             session.commit()
             session.refresh(orm)
@@ -260,6 +261,26 @@ research brief didn't supply any."""
         except Exception as exc:
             logger.warning("Position paper draft failed for %s: %s", vendor_name, exc)
             return {"executive_summary": f"Position paper draft unavailable: {exc}"}
+
+    def _upload_to_sharepoint(self, vendor_name: str, docx_path: Path) -> str | None:
+        """Best-effort upload of the generated .docx to SharePoint (mirrors
+        the same behavior for Tech Desk Reports in reports/generator.py).
+        Inert (returns None) unless SharePoint is configured; a failed
+        upload never fails position paper generation — the local copy is
+        always saved regardless."""
+        settings = get_settings()
+        if not settings.sharepoint_configured:
+            return None
+
+        from tech_desk.integrations import sharepoint_client
+
+        try:
+            return sharepoint_client.upload_file("position_papers", docx_path.name, docx_path.read_bytes())
+        except sharepoint_client.SharePointError:
+            logger.exception(
+                "SharePoint upload failed for position paper %s (local copy still saved)", vendor_name
+            )
+            return None
 
     def _render_docx(self, vendor_name: str, paper: dict) -> Path:
         from tech_desk.reports import docx_theme as theme

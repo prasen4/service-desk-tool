@@ -549,10 +549,15 @@ export default function VendorProfile() {
                     <div className="ts">{formatDateTime(p.generated_at || p.created_at)}</div>
                     {p.error_message && <div className="error-text" style={{ marginTop: "var(--space-2)" }}>{p.error_message}</div>}
                     {p.status === "completed" && p.docx_path && (
-                      <div style={{ marginTop: "var(--space-2)" }}>
+                      <div style={{ marginTop: "var(--space-2)", display: "flex", gap: "var(--space-3)" }}>
                         <a className="link" href={`/api/vendors/position-papers/${p.id}/download`}>
                           Download .docx
                         </a>
+                        {p.sharepoint_url && (
+                          <a className="link" href={p.sharepoint_url} target="_blank" rel="noreferrer">
+                            View in SharePoint
+                          </a>
+                        )}
                       </div>
                     )}
                   </div>

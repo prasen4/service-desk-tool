@@ -125,6 +125,7 @@ def _serialize_position_paper(p: "PositionPaperORM") -> dict:
         "status": p.status,
         "custom_prompt": p.custom_prompt,
         "docx_path": p.docx_path,
+        "sharepoint_url": p.sharepoint_url,
         "error_message": p.error_message,
         "created_at": p.created_at.isoformat(),
         "generated_at": p.generated_at.isoformat() if p.generated_at else None,

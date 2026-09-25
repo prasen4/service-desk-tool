@@ -106,7 +106,8 @@ def _to_server_relative_path(path: str) -> str:
 def upload_file(folder_relative_path: str, filename: str, content: bytes) -> str:
     """Uploads `content` as `filename` into
     `<SHAREPOINT_REPORTS_FOLDER>/<folder_relative_path>` (folders are created
-    automatically if they don't exist). Returns the file's server-relative URL.
+    automatically if they don't exist). Returns a full, clickable URL to the
+    uploaded file (not just the API's server-relative path).
     """
     settings = get_settings()
     ctx = _get_client_context()
@@ -117,7 +118,8 @@ def upload_file(folder_relative_path: str, filename: str, content: bytes) -> str
     try:
         folder = ctx.web.ensure_folder_path(target_folder_url).execute_query()
         uploaded = folder.upload_file(filename, content).execute_query()
-        return uploaded.serverRelativeUrl
+        site_netloc = urlparse(settings.sharepoint_site_url).netloc
+        return f"https://{site_netloc}{uploaded.serverRelativeUrl}"
     except Exception as exc:
         logger.exception("SharePoint upload failed for %s at %s", filename, target_folder_url)
         raise SharePointError(f"SharePoint upload failed for {filename}: {exc}") from exc

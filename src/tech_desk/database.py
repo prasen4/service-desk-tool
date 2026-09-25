@@ -181,6 +181,7 @@ class PositionPaperORM(Base):
     custom_prompt: Mapped[str] = mapped_column(Text, default="")
     research_brief_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     docx_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    sharepoint_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, index=True)
     generated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -418,6 +419,7 @@ def position_paper_from_orm(orm: PositionPaperORM) -> PositionPaperResult:
         status=orm.status,
         custom_prompt=orm.custom_prompt,
         docx_path=orm.docx_path,
+        sharepoint_url=orm.sharepoint_url,
         generated_at=orm.generated_at,
         error_message=orm.error_message,
     )

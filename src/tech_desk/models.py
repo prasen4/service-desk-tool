@@ -224,5 +224,6 @@ class PositionPaperResult(BaseModel):
     status: str
     custom_prompt: str = ""
     docx_path: str | None = None
+    sharepoint_url: str | None = None
     generated_at: datetime | None = None
     error_message: str | None = None

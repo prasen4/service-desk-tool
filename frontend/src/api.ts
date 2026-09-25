@@ -254,6 +254,7 @@ export interface PositionPaper {
   status: "running" | "completed" | "failed" | string;
   custom_prompt: string;
   docx_path: string | null;
+  sharepoint_url: string | null;
   error_message: string | null;
   created_at: string;
   generated_at: string | null;
