@@ -38,7 +38,16 @@ def _require_configured() -> None:
         )
 
 
-def _acquire_token() -> str:
+def _acquire_token() -> dict:
+    """Returns the raw MSAL token response dict.
+
+    `ClientContext.with_access_token()` (office365-rest-python-client) calls
+    `TokenResponse.from_json(...)` on whatever this callback returns unless
+    it's already a `TokenResponse`. Returning a bare access-token string here
+    (instead of the full dict) makes `from_json` call `.get()` on a `str`,
+    which fails with an opaque `'str' object has no attribute 'get'` deep
+    inside the library's auth event handler.
+    """
     settings = get_settings()
     try:
         import msal
@@ -63,7 +72,7 @@ def _acquire_token() -> str:
             f"Failed to acquire SharePoint app-only token: "
             f"{result.get('error')}: {result.get('error_description')}"
         )
-    return result["access_token"]
+    return result
 
 
 def _get_client_context():
