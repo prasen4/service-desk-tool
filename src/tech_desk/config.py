@@ -97,9 +97,12 @@ class Settings(BaseSettings):
     sharepoint_client_secret: str | None = Field(default=None, validation_alias="SHAREPOINT_CLIENT_SECRET")
     sharepoint_tenant_id: str | None = Field(default=None, validation_alias="SHAREPOINT_TENANT_ID")
     # Folder (relative to the site's default document library) where generated
-    # reports get auto-uploaded once SharePoint settings above are configured.
+    # reports/position papers get auto-uploaded once SharePoint settings above
+    # are configured. Reports go under "<this>/Reports/<period>" and position
+    # papers go under "<this>/Position Papers" (see reports/generator.py and
+    # reports/position_paper.py).
     sharepoint_reports_folder: str = Field(
-        default="Shared Documents/Tech Desk Reports", validation_alias="SHAREPOINT_REPORTS_FOLDER"
+        default="Shared Documents/Tech Desk Tool Artifacts", validation_alias="SHAREPOINT_REPORTS_FOLDER"
     )
 
     # Okta SSO login for this app (separate from SharePoint's own Entra ID app

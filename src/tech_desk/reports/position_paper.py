@@ -275,7 +275,7 @@ research brief didn't supply any."""
         from tech_desk.integrations import sharepoint_client
 
         try:
-            return sharepoint_client.upload_file("position_papers", docx_path.name, docx_path.read_bytes())
+            return sharepoint_client.upload_file("Position Papers", docx_path.name, docx_path.read_bytes())
         except sharepoint_client.SharePointError:
             logger.exception(
                 "SharePoint upload failed for position paper %s (local copy still saved)", vendor_name

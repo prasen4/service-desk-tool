@@ -160,7 +160,9 @@ class ReportGenerator:
                 from tech_desk.integrations import sharepoint_client
 
                 try:
-                    sharepoint_url = sharepoint_client.upload_file(period, docx_path.name, docx_path.read_bytes())
+                    sharepoint_url = sharepoint_client.upload_file(
+                        f"Reports/{period}", docx_path.name, docx_path.read_bytes()
+                    )
                 except sharepoint_client.SharePointError:
                     logger.exception("SharePoint upload failed for report %s (local copy still saved)", title)
 
