@@ -17,10 +17,22 @@ from tech_desk.database import get_db_session
 
 router = APIRouter(prefix="/api/sharepoint", tags=["sharepoint"])
 
+# Users can browse/import from anywhere they can type a path into the "Folder
+# path" box, so this is enforced here server-side rather than just defaulted
+# in the frontend.
+BROWSE_ROOT = "Shared Documents/0 - PUBLIC"
+
 
 class SharePointImportRequest(BaseModel):
     path: str = Field(..., min_length=1, max_length=1024, description="SharePoint file path (as returned by /browse)")
     author: str = Field(default="", max_length=128)
+
+
+def _enforce_browse_root(path: str) -> None:
+    normalized = path.strip("/").lower()
+    root_normalized = BROWSE_ROOT.strip("/").lower()
+    if normalized != root_normalized and not normalized.startswith(root_normalized + "/"):
+        raise HTTPException(status_code=400, detail=f"Browsing is restricted to '{BROWSE_ROOT}' and its subfolders.")
 
 
 @router.get("/status")
@@ -31,11 +43,12 @@ async def sharepoint_status():
 
 
 @router.get("/browse")
-async def browse_sharepoint(path: str = "Shared Documents"):
+async def browse_sharepoint(path: str = BROWSE_ROOT):
     from tech_desk.integrations import sharepoint_client
 
     if not sharepoint_client.is_configured():
         raise HTTPException(status_code=400, detail="SharePoint is not configured.")
+    _enforce_browse_root(path)
     try:
         entries = sharepoint_client.list_folder(path)
     except sharepoint_client.SharePointError as exc:
@@ -56,6 +69,7 @@ async def import_from_sharepoint(
 
     if not sharepoint_client.is_configured():
         raise HTTPException(status_code=400, detail="SharePoint is not configured.")
+    _enforce_browse_root(req.path)
     try:
         content = sharepoint_client.download_file(req.path)
     except sharepoint_client.SharePointError as exc:

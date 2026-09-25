@@ -40,7 +40,7 @@ export default function VendorProfile() {
 
   const [spEnabled, setSpEnabled] = useState(false);
   const [showSpModal, setShowSpModal] = useState(false);
-  const [spPath, setSpPath] = useState("Shared Documents");
+  const [spPath, setSpPath] = useState("Shared Documents/0 - PUBLIC");
   const [spEntries, setSpEntries] = useState<SharePointEntry[]>([]);
   const [spLoading, setSpLoading] = useState(false);
   const [spError, setSpError] = useState<string | null>(null);
