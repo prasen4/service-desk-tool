@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     # papers go under "<this>/Position Papers" (see reports/generator.py and
     # reports/position_paper.py).
     sharepoint_reports_folder: str = Field(
-        default="Shared Documents/Tech Desk Tool Artifacts", validation_alias="SHAREPOINT_REPORTS_FOLDER"
+        default="Shared Documents/0 - PUBLIC/Tech Desk Tool Artifacts", validation_alias="SHAREPOINT_REPORTS_FOLDER"
     )
 
     # Okta SSO login for this app (separate from SharePoint's own Entra ID app
