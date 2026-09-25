@@ -167,6 +167,26 @@ def test_vendor_not_found_returns_404(client):
     assert resp.status_code == 404
 
 
+def test_import_attachment_from_sharepoint_creates_note_and_attachment(client, db_session):
+    from tech_desk import vendor_profiles
+
+    vendor = _unique_vendor("Test Vendor SharePointImport")
+    note = vendor_profiles.import_attachment_from_sharepoint(
+        db_session,
+        vendor,
+        filename="position_paper.pdf",
+        content=b"%PDF-1.4 fake pdf bytes",
+        author="carla",
+    )
+    assert "Imported from SharePoint" in note["body"]
+    assert note["author"] == "carla"
+    assert len(note["attachments"]) == 1
+    assert note["attachments"][0]["filename"] == "position_paper.pdf"
+
+    profile = client.get(f"/api/vendors/{vendor}/profile").json()
+    assert any(a["filename"] == "position_paper.pdf" for a in profile["attachments"])
+
+
 def test_list_vendor_profiles_filters_by_status(client):
     vendor = _unique_vendor("Test Vendor FilterStatus")
     client.post(f"/api/vendors/{vendor}/notes", data={"body": "Init.", "author": ""})

@@ -325,6 +325,63 @@ def save_attachment(
     return attachment
 
 
+def save_attachment_bytes(
+    session: Session,
+    vendor: VendorORM,
+    *,
+    filename: str,
+    content: bytes,
+    content_type: str = "application/octet-stream",
+    note: VendorNoteORM | None = None,
+) -> VendorAttachmentORM:
+    """Same as `save_attachment`, but for content already in memory (e.g.
+    downloaded from SharePoint) rather than a multipart `UploadFile`."""
+    original_name = _sanitize_filename(filename)
+    _validate_extension(original_name)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise InvalidAttachmentError(f"File exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit.")
+
+    stored_name = f"{uuid.uuid4().hex}{Path(original_name).suffix.lower()}"
+    dest = _attachments_dir(vendor.id) / stored_name
+    dest.write_bytes(content)
+
+    attachment = VendorAttachmentORM(
+        vendor_id=vendor.id,
+        note_id=note.id if note else None,
+        original_filename=original_name,
+        stored_filename=stored_name,
+        content_type=content_type,
+        size_bytes=len(content),
+    )
+    session.add(attachment)
+    session.flush()
+    return attachment
+
+
+def import_attachment_from_sharepoint(
+    session: Session,
+    vendor_name: str,
+    *,
+    filename: str,
+    content: bytes,
+    author: str = "",
+) -> dict:
+    """Attaches a file already downloaded from SharePoint to a vendor's
+    profile, as a note+attachment (same shape as a manually-uploaded note)."""
+    vendor = get_or_create_vendor(session, vendor_name)
+    note = VendorNoteORM(
+        vendor_id=vendor.id,
+        body=f"Imported from SharePoint: {filename}",
+        author=(author or "").strip(),
+    )
+    session.add(note)
+    session.flush()
+
+    attachment = save_attachment_bytes(session, vendor, filename=filename, content=content, note=note)
+    session.commit()
+    return _serialize_note(note, [attachment])
+
+
 def attachment_path(attachment: VendorAttachmentORM) -> Path:
     return _attachments_dir(attachment.vendor_id) / attachment.stored_filename
 

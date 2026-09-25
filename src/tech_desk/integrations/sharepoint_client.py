@@ -113,6 +113,29 @@ def list_files(folder_relative_path: str = "") -> list[dict]:
         raise SharePointError(f"SharePoint list failed for {target_folder_url}: {exc}") from exc
 
 
+def list_folder(folder_path: str) -> list[dict]:
+    """Lists both files and subfolders at an arbitrary server-relative folder
+    path anywhere in the configured site (unlike `list_files`, this is not
+    scoped to `SHAREPOINT_REPORTS_FOLDER`) — used for browsing/importing
+    existing vendor documents (position papers, notes, etc.) into the CRM.
+    """
+    ctx = _get_client_context()
+    folder_path = folder_path.strip("/")
+    try:
+        folder = ctx.web.get_folder_by_server_relative_url(folder_path)
+        folder.expand(["Folders", "Files"]).get().execute_query()
+        entries = [
+            {"name": f.name, "url": f.serverRelativeUrl, "is_folder": True, "size": None} for f in folder.folders
+        ]
+        entries += [
+            {"name": f.name, "url": f.serverRelativeUrl, "is_folder": False, "size": f.length}
+            for f in folder.files
+        ]
+        return entries
+    except Exception as exc:
+        raise SharePointError(f"SharePoint browse failed for '{folder_path or '/'}': {exc}") from exc
+
+
 def download_file(server_relative_url: str) -> bytes:
     """Downloads a file by its SharePoint server-relative URL (as returned by
     `upload_file`/`list_files`)."""

@@ -67,6 +67,8 @@ def test_okta_helpers_raise_clear_error_when_unconfigured(blank_okta_env):
 def test_sharepoint_helpers_raise_clear_error_when_unconfigured(blank_sharepoint_env):
     with pytest.raises(sharepoint_client.SharePointError):
         sharepoint_client.upload_file("weekly", "report.docx", b"data")
+    with pytest.raises(sharepoint_client.SharePointError):
+        sharepoint_client.list_folder("Shared Documents")
 
 
 def test_session_cookie_round_trip():
@@ -91,4 +93,23 @@ def test_auth_status_endpoint_disabled_by_default(client, blank_okta_env):
 
 def test_login_route_400_when_unconfigured(client, blank_okta_env):
     resp = client.get("/api/auth/login", follow_redirects=False)
+    assert resp.status_code == 400
+
+
+def test_sharepoint_status_endpoint_disabled_by_default(client, blank_sharepoint_env):
+    resp = client.get("/api/sharepoint/status")
+    assert resp.status_code == 200
+    assert resp.json() == {"enabled": False}
+
+
+def test_sharepoint_browse_400_when_unconfigured(client, blank_sharepoint_env):
+    resp = client.get("/api/sharepoint/browse", params={"path": "Shared Documents"})
+    assert resp.status_code == 400
+
+
+def test_sharepoint_import_400_when_unconfigured(client, blank_sharepoint_env):
+    resp = client.post(
+        "/api/sharepoint/import/SomeVendor",
+        json={"path": "Shared Documents/SomeVendor/paper.pdf", "author": ""},
+    )
     assert resp.status_code == 400

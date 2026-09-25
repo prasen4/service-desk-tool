@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, type VendorProfile as VendorProfileType, type VendorStatusOption, type PositionPaper } from "../api";
+import {
+  api,
+  type VendorProfile as VendorProfileType,
+  type VendorStatusOption,
+  type PositionPaper,
+  type SharePointEntry,
+} from "../api";
 import { formatDate, formatDateTime } from "../utils";
 import { useJobActivity } from "../hooks/useJobActivity";
 
@@ -31,6 +37,21 @@ export default function VendorProfile() {
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [customPrompt, setCustomPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
+
+  const [spEnabled, setSpEnabled] = useState(false);
+  const [showSpModal, setShowSpModal] = useState(false);
+  const [spPath, setSpPath] = useState("Shared Documents");
+  const [spEntries, setSpEntries] = useState<SharePointEntry[]>([]);
+  const [spLoading, setSpLoading] = useState(false);
+  const [spError, setSpError] = useState<string | null>(null);
+  const [spImportingUrl, setSpImportingUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .get<{ enabled: boolean }>("/api/sharepoint/status")
+      .then((res) => setSpEnabled(res.enabled))
+      .catch(() => setSpEnabled(false));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -155,6 +176,41 @@ export default function VendorProfile() {
     }
   }
 
+  async function browseSharePoint(path: string) {
+    setSpLoading(true);
+    setSpError(null);
+    try {
+      const res = await api.get<{ path: string; entries: SharePointEntry[] }>(
+        `/api/sharepoint/browse?path=${encodeURIComponent(path)}`
+      );
+      setSpPath(res.path);
+      setSpEntries(res.entries);
+    } catch (e: any) {
+      setSpError(e.message || "Failed to browse SharePoint");
+    } finally {
+      setSpLoading(false);
+    }
+  }
+
+  function openSharePointModal() {
+    setShowSpModal(true);
+    browseSharePoint(spPath);
+  }
+
+  async function importSharePointFile(entry: SharePointEntry) {
+    setSpImportingUrl(entry.url);
+    setSpError(null);
+    try {
+      await api.post(`/api/sharepoint/import/${encodeURIComponent(vendorName)}`, { path: entry.url, author: "" });
+      setShowSpModal(false);
+      load();
+    } catch (e: any) {
+      setSpError(e.message || "Failed to import file");
+    } finally {
+      setSpImportingUrl(null);
+    }
+  }
+
   if (loading) return <div className="empty">Loading vendor profile...</div>;
   if (error || !profile) {
     return (
@@ -256,6 +312,65 @@ export default function VendorProfile() {
         </div>
       )}
 
+      {showSpModal && (
+        <div className="modal-overlay" onClick={() => !spImportingUrl && setShowSpModal(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <h3>Import from SharePoint</h3>
+            <div className="form-group">
+              <label>Folder path</label>
+              <div className="file-input-row">
+                <input
+                  type="text"
+                  value={spPath}
+                  onChange={(e) => setSpPath(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") browseSharePoint(spPath);
+                  }}
+                />
+                <button type="button" className="btn" onClick={() => browseSharePoint(spPath)} disabled={spLoading}>
+                  Go
+                </button>
+              </div>
+            </div>
+            {spError && <p className="error-text">{spError}</p>}
+            {spLoading ? (
+              <div className="empty">Loading...</div>
+            ) : !spEntries.length ? (
+              <div className="empty">No files or folders here.</div>
+            ) : (
+              <div className="sharepoint-browse-list">
+                {spEntries.map((entry) => (
+                  <div key={entry.url} className="sharepoint-browse-row">
+                    {entry.is_folder ? (
+                      <button type="button" className="link" onClick={() => browseSharePoint(entry.url)}>
+                        📁 {entry.name}
+                      </button>
+                    ) : (
+                      <>
+                        <span>📄 {entry.name}</span>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          disabled={spImportingUrl === entry.url}
+                          onClick={() => importSharePointFile(entry)}
+                        >
+                          {spImportingUrl === entry.url ? "Importing..." : "Import"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="modal-actions">
+              <button className="btn btn-outline" disabled={!!spImportingUrl} onClick={() => setShowSpModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="tabs">
         <div className={"tab" + (tab === "notes" ? " active" : "")} onClick={() => setTab("notes")}>
           Notes ({profile.notes.length})
@@ -276,7 +391,14 @@ export default function VendorProfile() {
 
       {tab === "notes" && (
         <div className="panel">
-          <h2>Add a Note</h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h2 style={{ marginBottom: 0 }}>Add a Note</h2>
+            {spEnabled && (
+              <button type="button" className="btn" onClick={openSharePointModal}>
+                Import from SharePoint
+              </button>
+            )}
+          </div>
           <form onSubmit={submitNote}>
             {noteError && <p className="error-text" style={{ marginBottom: "var(--space-4)" }}>{noteError}</p>}
             <div className="form-group">

@@ -19,6 +19,7 @@ from tech_desk import __version__
 from tech_desk.api.auth_routes import SESSION_COOKIE, router as auth_router
 from tech_desk.api.jobs import job_manager
 from tech_desk.api.rate_limit import configure_limiter, pipeline_limiter, rate_limit
+from tech_desk.api.sharepoint_routes import router as sharepoint_router
 from tech_desk.api.services import run_pipeline_job, run_report_job, run_research_job
 from tech_desk.api.vendor_routes import router as vendor_router
 from tech_desk.config import ReportPeriod, add_vendor_to_desk, get_settings, load_desk_config, resolve_desks
@@ -193,6 +194,7 @@ elif STATIC_DIR.exists():
 
 app.include_router(vendor_router)
 app.include_router(auth_router)
+app.include_router(sharepoint_router)
 
 
 @app.exception_handler(Exception)

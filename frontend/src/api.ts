@@ -206,6 +206,22 @@ export interface VendorStatusEvent {
   duration_label?: string | null;
 }
 
+export interface SharePointStatus {
+  enabled: boolean;
+}
+
+export interface SharePointEntry {
+  name: string;
+  url: string;
+  is_folder: boolean;
+  size: number | null;
+}
+
+export interface SharePointBrowseResponse {
+  path: string;
+  entries: SharePointEntry[];
+}
+
 export interface VendorProfile {
   id: number | null;
   name: string;
