@@ -85,15 +85,6 @@ class Settings(BaseSettings):
     # restores the old fully-sequential behavior.
     llm_analysis_concurrency: int = Field(default=2, validation_alias="LLM_ANALYSIS_CONCURRENCY")
 
-    # Max number of background jobs (research/report/pipeline/position-paper)
-    # that can execute at the same time across ALL users. Extra submissions
-    # beyond this just queue and start as soon as a slot frees up — they are
-    # not rejected. Raise this to let more people run pipelines concurrently,
-    # but remember each job also fans out its own LLM concurrency (see
-    # llm_analysis_concurrency), so the effective concurrent LLM call count is
-    # roughly job_max_workers * llm_analysis_concurrency.
-    job_max_workers: int = Field(default=4, validation_alias="JOB_MAX_WORKERS")
-
     @field_validator("search_backend", mode="before")
     @classmethod
     def _normalize_search_backend(cls, v):
@@ -105,6 +96,22 @@ class Settings(BaseSettings):
     sharepoint_client_id: str | None = Field(default=None, validation_alias="SHAREPOINT_CLIENT_ID")
     sharepoint_client_secret: str | None = Field(default=None, validation_alias="SHAREPOINT_CLIENT_SECRET")
     sharepoint_tenant_id: str | None = Field(default=None, validation_alias="SHAREPOINT_TENANT_ID")
+    # Folder (relative to the site's default document library) where generated
+    # reports get auto-uploaded once SharePoint settings above are configured.
+    sharepoint_reports_folder: str = Field(
+        default="Shared Documents/Tech Desk Reports", validation_alias="SHAREPOINT_REPORTS_FOLDER"
+    )
+
+    # Okta SSO login for this app (separate from SharePoint's own Entra ID app
+    # registration above — Okta authenticates users into Tech Desk itself).
+    # Login is only enabled/exposed when AUTH_ENABLED=true AND the three Okta
+    # fields below are all set; otherwise the app behaves exactly as today
+    # (no login wall).
+    auth_enabled: bool = Field(default=False, validation_alias="AUTH_ENABLED")
+    okta_issuer: str | None = Field(default=None, validation_alias="OKTA_ISSUER")
+    okta_client_id: str | None = Field(default=None, validation_alias="OKTA_CLIENT_ID")
+    okta_client_secret: str | None = Field(default=None, validation_alias="OKTA_CLIENT_SECRET")
+    okta_redirect_uri: str | None = Field(default=None, validation_alias="OKTA_REDIRECT_URI")
 
     config_path: Path = Field(default=Path("config/tech_desks.yaml"))
 
@@ -138,6 +145,17 @@ class Settings(BaseSettings):
     @property
     def db_backend(self) -> str:
         return "sqlite" if self.is_sqlite else self.database_url.split(":", 1)[0].split("+", 1)[0]
+
+    @property
+    def sharepoint_configured(self) -> bool:
+        return bool(
+            self.sharepoint_site_url and self.sharepoint_client_id
+            and self.sharepoint_client_secret and self.sharepoint_tenant_id
+        )
+
+    @property
+    def okta_configured(self) -> bool:
+        return bool(self.okta_issuer and self.okta_client_id and self.okta_client_secret and self.okta_redirect_uri)
 
 
 @lru_cache

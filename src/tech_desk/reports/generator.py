@@ -155,6 +155,15 @@ class ReportGenerator:
                 logger.exception("Report docx rendering failed for report %s", title)
                 docx_path = None
 
+            sharepoint_url = None
+            if docx_path and self.settings.sharepoint_configured:
+                from tech_desk.integrations import sharepoint_client
+
+                try:
+                    sharepoint_url = sharepoint_client.upload_file(period, docx_path.name, docx_path.read_bytes())
+                except sharepoint_client.SharePointError:
+                    logger.exception("SharePoint upload failed for report %s (local copy still saved)", title)
+
             orm = ReportORM(
                 period=period,
                 title=title,
@@ -166,6 +175,7 @@ class ReportGenerator:
                 markdown_path=str(paths.get("markdown", "")),
                 pdf_path=str(paths.get("pdf")) if paths.get("pdf") else None,
                 docx_path=str(docx_path) if docx_path else None,
+                sharepoint_url=sharepoint_url,
                 custom_instructions=custom_instructions or None,
             )
             session.add(orm)

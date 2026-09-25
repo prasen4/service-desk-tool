@@ -33,7 +33,7 @@ COPY --from=frontend-build /build/src/tech_desk/api/web/dist/ src/tech_desk/api/
 
 # Include the Postgres driver so DATABASE_URL can switch backends without
 # rebuilding; SQLite remains the default when DATABASE_URL is empty.
-RUN pip install --no-cache-dir ".[postgres]"
+RUN pip install --no-cache-dir ".[postgres,sharepoint]"
 
 # Run as a non-root user and let it own the data volume.
 RUN useradd --system --create-home --home-dir /home/techdesk techdesk \

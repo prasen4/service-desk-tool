@@ -16,6 +16,7 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from tech_desk import __version__
+from tech_desk.api.auth_routes import router as auth_router
 from tech_desk.api.jobs import job_manager
 from tech_desk.api.rate_limit import configure_limiter, pipeline_limiter, rate_limit
 from tech_desk.api.services import run_pipeline_job, run_report_job, run_research_job
@@ -162,6 +163,7 @@ elif STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 app.include_router(vendor_router)
+app.include_router(auth_router)
 
 
 @app.exception_handler(Exception)
@@ -539,6 +541,7 @@ async def list_reports(limit: int = 20, offset: int = 0, session: Session = Depe
                 "has_html": bool(r.html_path),
                 "has_pdf": bool(r.pdf_path),
                 "has_docx": bool(r.docx_path),
+                "sharepoint_url": r.sharepoint_url,
             }
             for r in reports
         ],
@@ -562,6 +565,7 @@ async def get_report(report_id: int, session: Session = Depends(get_db_session))
         "markdown_path": report.markdown_path,
         "pdf_path": report.pdf_path,
         "docx_path": report.docx_path,
+        "sharepoint_url": report.sharepoint_url,
     }
 
 
