@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/sharepoint", tags=["sharepoint"])
 
 
 class SharePointImportRequest(BaseModel):
-    path: str = Field(..., min_length=1, max_length=1024, description="Server-relative SharePoint file URL")
+    path: str = Field(..., min_length=1, max_length=1024, description="SharePoint file path (as returned by /browse)")
     author: str = Field(default="", max_length=128)
 
 
